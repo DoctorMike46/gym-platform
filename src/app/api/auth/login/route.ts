@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { trainers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
+import { createSessionToken } from "@/lib/auth";
 
 export async function POST(request: NextRequest) {
     try {
@@ -20,8 +21,15 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: "Email o password non corretti." }, { status: 401 });
         }
 
+        // Genera JWT con identità del trainer
+        const token = await createSessionToken({
+            id: trainer.id,
+            email: trainer.email,
+            role: trainer.role || "trainer"
+        });
+
         const response = NextResponse.json({ success: true });
-        response.cookies.set("trainer_session", "authenticated", {
+        response.cookies.set("trainer_session", token, {
             httpOnly: true,
             secure: process.env.NODE_ENV === "production",
             sameSite: "lax",

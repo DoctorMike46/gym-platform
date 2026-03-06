@@ -4,20 +4,22 @@ import { db } from "@/db";
 import { settings } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
+import { getAuthenticatedTrainer } from "@/lib/auth";
 
 export async function getSettings() {
     try {
-        const result = await db.select().from(settings).limit(1);
+        const trainer = await getAuthenticatedTrainer();
+        const result = await db.select().from(settings).where(eq(settings.trainer_id, trainer.id)).limit(1);
         return result[0] || null;
-    } catch (error) {
-        console.error("Errore fetch settings:", error);
+    } catch {
+        // Non autenticato (es. pagina login) — restituisci null
         return null;
     }
 }
 
 export async function updateSettings(formData: FormData) {
+    const trainer = await getAuthenticatedTrainer();
     try {
-
         const site_name = formData.get("site_name") as string;
         const primary_color = formData.get("primary_color") as string;
         const sidebar_color = formData.get("sidebar_color") as string;
@@ -32,7 +34,7 @@ export async function updateSettings(formData: FormData) {
         const pdf_services_start = formData.get("pdf_services_start") as string | null;
         const pdf_workouts_footer = formData.get("pdf_workouts_footer") as string | null;
 
-        const existing = await db.select().from(settings).limit(1);
+        const existing = await db.select().from(settings).where(eq(settings.trainer_id, trainer.id)).limit(1);
 
         const updateData: Record<string, any> = { site_name, primary_color, sidebar_color };
         if (secondary_color) updateData.secondary_color = secondary_color;
@@ -50,7 +52,7 @@ export async function updateSettings(formData: FormData) {
                 .where(eq(settings.id, existing[0].id));
         } else {
             await db.insert(settings).values({
-                trainer_id: "default_trainer",
+                trainer_id: trainer.id,
                 site_name,
                 primary_color,
                 sidebar_color,

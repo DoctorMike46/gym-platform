@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { jwtVerify } from "jose";
+
+const JWT_SECRET = new TextEncoder().encode(
+    process.env.JWT_SECRET || "dev-secret-change-in-production-32ch"
+);
 
 const PUBLIC_PATHS = ["/login", "/api/auth/login", "/api/auth/logout"];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // Allow public paths and static files
@@ -14,14 +19,23 @@ export function middleware(request: NextRequest) {
 
     if (isPublic) return NextResponse.next();
 
-    const session = request.cookies.get("trainer_session");
+    const token = request.cookies.get("trainer_session")?.value;
 
-    if (!session || session.value !== "authenticated") {
+    if (!token) {
         const loginUrl = new URL("/login", request.url);
         return NextResponse.redirect(loginUrl);
     }
 
-    return NextResponse.next();
+    try {
+        await jwtVerify(token, JWT_SECRET);
+        return NextResponse.next();
+    } catch {
+        // Token invalido o scaduto → redirect al login
+        const loginUrl = new URL("/login", request.url);
+        const response = NextResponse.redirect(loginUrl);
+        response.cookies.set("trainer_session", "", { httpOnly: true, maxAge: 0, path: "/" });
+        return response;
+    }
 }
 
 export const config = {

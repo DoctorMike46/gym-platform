@@ -3,8 +3,10 @@ import { getClientById } from "@/lib/actions/clients";
 import { getServices } from "@/lib/actions/services";
 import { getAllWorkoutTemplates } from "@/lib/actions/workout-assignments";
 import ClientDetailContent from "./client-detail-content";
+import { requireAuth } from "@/lib/auth";
 
 export default async function ClientDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    await requireAuth();
     const { id } = await params;
     const clientId = parseInt(id);
 

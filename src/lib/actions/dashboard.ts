@@ -3,22 +3,29 @@
 import { db } from "@/db";
 import { clients, subscriptions, services } from "@/db/schema";
 import { count, eq, and, sql, desc } from "drizzle-orm";
+import { getAuthenticatedTrainer } from "@/lib/auth";
 
 export async function getDashboardStats() {
+    const trainer = await getAuthenticatedTrainer();
     try {
-        // Total active clients (those with an active subscription)
-        const activeClientsCount = await db
-            .select({ val: count() })
+        // Total active clients (those with at least one active subscription)
+        const activeClientsResult = await db
+            .select({ val: sql<number>`count(distinct ${clients.id})` })
             .from(clients)
-            .leftJoin(subscriptions, eq(clients.id, subscriptions.client_id))
-            .where(eq(subscriptions.status, "attivo"));
+            .innerJoin(subscriptions, eq(clients.id, subscriptions.client_id))
+            .where(and(
+                eq(clients.trainer_id, trainer.id),
+                eq(subscriptions.status, "attivo")
+            ));
 
-        // Subscriptions expiring soon (e.g., in the next 14 days)
-        const expiringSoonCount = await db
-            .select({ val: count() })
+        // Subscriptions expiring soon (next 14 days)
+        const expiringSoonResult = await db
+            .select({ val: count(subscriptions.id) })
             .from(subscriptions)
+            .innerJoin(clients, eq(subscriptions.client_id, clients.id))
             .where(
                 and(
+                    eq(clients.trainer_id, trainer.id),
                     eq(subscriptions.status, "attivo"),
                     sql`${subscriptions.data_fine} <= CURRENT_DATE + INTERVAL '14 days'`,
                     sql`${subscriptions.data_fine} >= CURRENT_DATE`
@@ -26,32 +33,43 @@ export async function getDashboardStats() {
             );
 
         // New clients this month
-        const newClientsThisMonth = await db
-            .select({ val: count() })
+        const newClientsThisMonthResult = await db
+            .select({ val: count(clients.id) })
             .from(clients)
-            .where(sql`EXTRACT(MONTH FROM ${clients.created_at}) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM ${clients.created_at}) = EXTRACT(YEAR FROM CURRENT_DATE)`);
+            .where(and(
+                eq(clients.trainer_id, trainer.id),
+                sql`EXTRACT(MONTH FROM ${clients.created_at}) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM ${clients.created_at}) = EXTRACT(YEAR FROM CURRENT_DATE)`
+            ));
 
-        // Estimated monthly revenue (sum of prices for active subscriptions)
+        // Estimated monthly revenue
         const revenueResult = await db
             .select({ total: sql<number>`COALESCE(SUM(${services.prezzo}), 0)` })
             .from(subscriptions)
-            .leftJoin(services, eq(subscriptions.service_id, services.id))
-            .where(eq(subscriptions.status, "attivo"));
+            .innerJoin(clients, eq(subscriptions.client_id, clients.id))
+            .innerJoin(services, eq(subscriptions.service_id, services.id))
+            .where(and(
+                eq(clients.trainer_id, trainer.id),
+                eq(subscriptions.status, "attivo")
+            ));
 
-        // Top services by active subscriptions count
+        // Top services
         const topServices = await db
             .select({
                 name: services.nome_servizio,
-                count: count(),
+                count: count(subscriptions.id),
             })
             .from(subscriptions)
-            .leftJoin(services, eq(subscriptions.service_id, services.id))
-            .where(eq(subscriptions.status, "attivo"))
+            .innerJoin(clients, eq(subscriptions.client_id, clients.id))
+            .innerJoin(services, eq(subscriptions.service_id, services.id))
+            .where(and(
+                eq(clients.trainer_id, trainer.id),
+                eq(subscriptions.status, "attivo")
+            ))
             .groupBy(services.nome_servizio)
-            .orderBy(desc(count()))
+            .orderBy(desc(sql`count(*)`))
             .limit(5);
 
-        // Clients expiring soon (list with details)
+        // Expiring clients
         const expiringClients = await db
             .select({
                 clientName: sql<string>`${clients.nome} || ' ' || ${clients.cognome}`,
@@ -59,10 +77,11 @@ export async function getDashboardStats() {
                 expiryDate: subscriptions.data_fine,
             })
             .from(subscriptions)
-            .leftJoin(clients, eq(subscriptions.client_id, clients.id))
-            .leftJoin(services, eq(subscriptions.service_id, services.id))
+            .innerJoin(clients, eq(subscriptions.client_id, clients.id))
+            .innerJoin(services, eq(subscriptions.service_id, services.id))
             .where(
                 and(
+                    eq(clients.trainer_id, trainer.id),
                     eq(subscriptions.status, "attivo"),
                     sql`${subscriptions.data_fine} <= CURRENT_DATE + INTERVAL '14 days'`,
                     sql`${subscriptions.data_fine} >= CURRENT_DATE`
@@ -72,38 +91,50 @@ export async function getDashboardStats() {
             .limit(5);
 
         // Total clients
-        const totalClientsCount = await db.select({ val: count() }).from(clients);
+        const totalClientsResult = await db
+            .select({ val: count(clients.id) })
+            .from(clients)
+            .where(eq(clients.trainer_id, trainer.id));
 
-        // Monthly client growth (last 6 months)
+        // Monthly growth
         const monthlyGrowth = await db
             .select({
                 month: sql<string>`TO_CHAR(${clients.created_at}, 'YYYY-MM')`,
-                count: count(),
+                count: count(clients.id),
             })
             .from(clients)
-            .where(sql`${clients.created_at} >= CURRENT_DATE - INTERVAL '6 months'`)
+            .where(and(
+                eq(clients.trainer_id, trainer.id),
+                sql`${clients.created_at} >= CURRENT_DATE - INTERVAL '6 months'`
+            ))
             .groupBy(sql`TO_CHAR(${clients.created_at}, 'YYYY-MM')`)
             .orderBy(sql`TO_CHAR(${clients.created_at}, 'YYYY-MM')`);
 
         // Churn: subscriptions that expired this month
-        const expiredThisMonth = await db
-            .select({ val: count() })
+        const expiredThisMonthResult = await db
+            .select({ val: count(subscriptions.id) })
             .from(subscriptions)
+            .innerJoin(clients, eq(subscriptions.client_id, clients.id))
             .where(
                 and(
+                    eq(clients.trainer_id, trainer.id),
                     eq(subscriptions.status, "scaduto"),
-                    sql`EXTRACT(MONTH FROM ${subscriptions.data_fine}::timestamp) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM ${subscriptions.data_fine}::timestamp) = EXTRACT(YEAR FROM CURRENT_DATE)`
+                    sql`EXTRACT(MONTH FROM ${subscriptions.data_fine}) = EXTRACT(MONTH FROM CURRENT_DATE)`,
+                    sql`EXTRACT(YEAR FROM ${subscriptions.data_fine}) = EXTRACT(YEAR FROM CURRENT_DATE)`
                 )
             );
 
-        // Active subscriptions that started this month (new acquisitions)
-        const newSubsThisMonth = await db
-            .select({ val: count() })
+        // New subscriptions this month
+        const newSubsThisMonthResult = await db
+            .select({ val: count(subscriptions.id) })
             .from(subscriptions)
+            .innerJoin(clients, eq(subscriptions.client_id, clients.id))
             .where(
                 and(
+                    eq(clients.trainer_id, trainer.id),
                     eq(subscriptions.status, "attivo"),
-                    sql`EXTRACT(MONTH FROM ${subscriptions.data_inizio}::timestamp) = EXTRACT(MONTH FROM CURRENT_DATE) AND EXTRACT(YEAR FROM ${subscriptions.data_inizio}::timestamp) = EXTRACT(YEAR FROM CURRENT_DATE)`
+                    sql`EXTRACT(MONTH FROM ${subscriptions.data_inizio}) = EXTRACT(MONTH FROM CURRENT_DATE)`,
+                    sql`EXTRACT(YEAR FROM ${subscriptions.data_inizio}) = EXTRACT(YEAR FROM CURRENT_DATE)`
                 )
             );
 
@@ -120,25 +151,24 @@ export async function getDashboardStats() {
         }));
 
         return {
-            activeClients: activeClientsCount[0].val,
-            expiringSoon: expiringSoonCount[0].val,
-            newClients: newClientsThisMonth[0].val,
-            totalClients: totalClientsCount[0].val,
-            estimatedRevenue: revenueResult[0]?.total || 0,
+            activeClients: Number(activeClientsResult[0]?.val || 0),
+            expiringSoon: Number(expiringSoonResult[0]?.val || 0),
+            newClients: Number(newClientsThisMonthResult[0]?.val || 0),
+            totalClients: Number(totalClientsResult[0]?.val || 0),
+            estimatedRevenue: Number(revenueResult[0]?.total || 0),
             topServices: topServices.map(s => ({
                 name: s.name || "Sconosciuto",
-                count: s.count,
+                count: Number(s.count),
             })),
             expiringClients: expiringClients.map(c => ({
                 clientName: c.clientName,
                 serviceName: c.serviceName || "-",
                 expiryDate: c.expiryDate,
             })),
-            // New fields
             monthlyGrowth: growthData,
             churn: {
-                expiredThisMonth: expiredThisMonth[0]?.val || 0,
-                newSubsThisMonth: newSubsThisMonth[0]?.val || 0,
+                expiredThisMonth: Number(expiredThisMonthResult[0]?.val || 0),
+                newSubsThisMonth: Number(newSubsThisMonthResult[0]?.val || 0),
             },
         };
     } catch (error) {
@@ -156,4 +186,3 @@ export async function getDashboardStats() {
         };
     }
 }
-

@@ -85,6 +85,15 @@ export default function LoginForm({ primaryColor }: { primaryColor: string }) {
                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                 </div>
+                <div className="flex justify-end pt-1">
+                    <button
+                        type="button"
+                        onClick={() => router.push("/forgot-password")}
+                        className="text-xs font-medium text-slate-400 hover:text-slate-600 transition-colors"
+                    >
+                        Password dimenticata?
+                    </button>
+                </div>
             </div>
 
             {error && (

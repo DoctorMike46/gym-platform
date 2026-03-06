@@ -150,7 +150,7 @@ export default function ClientDetailContent({
             toast.success("Scheda assegnata con successo!");
             router.refresh();
         } else {
-            toast.error("Errore nell'assegnazione.");
+            toast.error(result.error || "Errore nell'assegnazione.");
         }
     }
 
@@ -538,7 +538,7 @@ export default function ClientDetailContent({
                             </CardHeader>
                             <CardContent className="pt-4">
                                 <p className="text-xs text-slate-400">Cliente dal</p>
-                                <p className="text-sm font-medium text-slate-700 mt-0.5">
+                                <p className="text-sm font-medium text-slate-700 mt-0.5" suppressHydrationWarning>
                                     {new Date(client.created_at).toLocaleDateString("it-IT", {
                                         day: "2-digit", month: "long", year: "numeric"
                                     })}

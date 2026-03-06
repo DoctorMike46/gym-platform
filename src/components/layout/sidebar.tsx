@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Users, LayoutDashboard, Dumbbell, ClipboardList, Wallet, FileText, ChevronLeft, ChevronRight, Settings, LogOut } from "lucide-react";
+import { Users, LayoutDashboard, Dumbbell, ClipboardList, Wallet, FileText, Megaphone, ChevronLeft, ChevronRight, Settings, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface SidebarProps {
@@ -79,7 +79,8 @@ export function Sidebar({ isCollapsed, setIsCollapsed, settings }: SidebarProps)
                 <SidebarItem href="/workouts" icon={<ClipboardList size={20} />} label="Schede" isCollapsed={isCollapsed} pathname={pathname} />
                 <SidebarItem href="/exercises" icon={<Dumbbell size={20} />} label="Esercizi" isCollapsed={isCollapsed} pathname={pathname} />
                 <SidebarItem href="/services" icon={<Wallet size={20} />} label="Servizi" isCollapsed={isCollapsed} pathname={pathname} />
-                {/* <SidebarItem href="/documents" icon={<FileText size={20} />} label="Documenti" isCollapsed={isCollapsed} pathname={pathname} /> */}
+                <SidebarItem href="/announcements" icon={<Megaphone size={20} />} label="Annunci" isCollapsed={isCollapsed} pathname={pathname} />
+                <SidebarItem href="/documents" icon={<FileText size={20} />} label="Documenti" isCollapsed={isCollapsed} pathname={pathname} />
             </nav>
 
             <div className="p-4 space-y-1.5">

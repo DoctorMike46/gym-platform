@@ -3,12 +3,14 @@
 import { db } from "@/db";
 import { services } from "@/db/schema";
 import { revalidatePath } from "next/cache";
-import { eq, desc } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
+import { getAuthenticatedTrainer } from "@/lib/auth";
 
 export async function getServices() {
+    const trainer = await getAuthenticatedTrainer();
     try {
         return await db.select().from(services)
-            .where(eq(services.is_active, true))
+            .where(and(eq(services.is_active, true), eq(services.trainer_id, trainer.id)))
             .orderBy(desc(services.id));
     } catch (error) {
         console.error("Errore nel recupero servizi:", error);
@@ -17,6 +19,7 @@ export async function getServices() {
 }
 
 export async function createService(formData: FormData) {
+    const trainer = await getAuthenticatedTrainer();
     try {
         const nome_servizio = formData.get("nome_servizio") as string;
         const categoria = formData.get("categoria") as string || "Generale";
@@ -31,10 +34,10 @@ export async function createService(formData: FormData) {
             return { success: false, error: "Campi obbligatori mancanti" };
         }
 
-        // Convert to cents (integer)
         const prezzo = Math.round(parseFloat(prezzoInput.replace(',', '.')) * 100);
 
         await db.insert(services).values({
+            trainer_id: trainer.id,
             nome_servizio,
             categoria,
             prezzo,
@@ -53,6 +56,7 @@ export async function createService(formData: FormData) {
 }
 
 export async function updateService(id: number, formData: FormData) {
+    const trainer = await getAuthenticatedTrainer();
     try {
         const nome_servizio = formData.get("nome_servizio") as string;
         const categoria = formData.get("categoria") as string || "Generale";
@@ -77,7 +81,7 @@ export async function updateService(id: number, formData: FormData) {
             caratteristiche,
             durata_settimane,
             include_coaching,
-        }).where(eq(services.id, id));
+        }).where(and(eq(services.id, id), eq(services.trainer_id, trainer.id)));
 
         revalidatePath("/services");
         return { success: true };
@@ -88,9 +92,10 @@ export async function updateService(id: number, formData: FormData) {
 }
 
 export async function deleteService(id: number) {
+    const trainer = await getAuthenticatedTrainer();
     try {
         // Soft delete per non rompere abbonamenti storici
-        await db.update(services).set({ is_active: false }).where(eq(services.id, id));
+        await db.update(services).set({ is_active: false }).where(and(eq(services.id, id), eq(services.trainer_id, trainer.id)));
         revalidatePath("/services");
         return { success: true };
     } catch (error) {

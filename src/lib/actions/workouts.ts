@@ -1,13 +1,17 @@
 "use server"
 
 import { db } from "@/db";
-import { workout_templates, workout_template_exercises, exercises } from "@/db/schema";
+import { workout_templates, workout_template_exercises } from "@/db/schema";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+import { getAuthenticatedTrainer } from "@/lib/auth";
 
 export async function getWorkoutTemplates() {
+    const trainer = await getAuthenticatedTrainer();
     try {
-        return await db.select().from(workout_templates).orderBy(workout_templates.created_at);
+        return await db.select().from(workout_templates)
+            .where(eq(workout_templates.trainer_id, trainer.id))
+            .orderBy(workout_templates.created_at);
     } catch (error) {
         console.error("Errore nel recupero dei template:", error);
         return [];
@@ -15,10 +19,13 @@ export async function getWorkoutTemplates() {
 }
 
 export async function getWorkoutTemplateWithExercises(templateId: number) {
+    const trainer = await getAuthenticatedTrainer();
     try {
         const template = await db.query.workout_templates.findFirst({
-            where: eq(workout_templates.id, templateId),
+            where: and(eq(workout_templates.id, templateId), eq(workout_templates.trainer_id, trainer.id)),
         });
+
+        if (!template) return null;
 
         const templateExercises = await db.query.workout_template_exercises.findMany({
             where: eq(workout_template_exercises.template_id, templateId),
@@ -50,8 +57,10 @@ export async function createWorkoutTemplate(data: {
         note_tecniche?: string;
     }[];
 }) {
+    const trainer = await getAuthenticatedTrainer();
     try {
         const [template] = await db.insert(workout_templates).values({
+            trainer_id: trainer.id,
             nome_template: data.nome_template,
             split_settimanale: data.split_settimanale,
             note_progressione: data.note_progressione,
@@ -96,7 +105,14 @@ export async function updateWorkoutTemplate(id: number, data: {
         note_tecniche?: string;
     }[];
 }) {
+    const trainer = await getAuthenticatedTrainer();
     try {
+        // Verifica ownership
+        const existing = await db.query.workout_templates.findFirst({
+            where: and(eq(workout_templates.id, id), eq(workout_templates.trainer_id, trainer.id)),
+        });
+        if (!existing) return { error: "Template non trovato o non autorizzato." };
+
         await db.update(workout_templates).set({
             nome_template: data.nome_template,
             split_settimanale: data.split_settimanale,
@@ -104,7 +120,7 @@ export async function updateWorkoutTemplate(id: number, data: {
             updated_at: new Date(),
         }).where(eq(workout_templates.id, id));
 
-        // Delete vecchi esercizi e reinserisci (approccio rimpiazzo completo)
+        // Delete vecchi esercizi e reinserisci
         await db.delete(workout_template_exercises)
             .where(eq(workout_template_exercises.template_id, id));
 
@@ -133,8 +149,9 @@ export async function updateWorkoutTemplate(id: number, data: {
 }
 
 export async function deleteWorkoutTemplate(id: number) {
+    const trainer = await getAuthenticatedTrainer();
     try {
-        await db.delete(workout_templates).where(eq(workout_templates.id, id));
+        await db.delete(workout_templates).where(and(eq(workout_templates.id, id), eq(workout_templates.trainer_id, trainer.id)));
         revalidatePath("/workouts");
         return { success: true };
     } catch (error) {

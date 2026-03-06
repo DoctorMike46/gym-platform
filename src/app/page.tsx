@@ -6,8 +6,10 @@ import Link from "next/link";
 import { getDashboardStats } from "@/lib/actions/dashboard";
 import { getSettings } from "@/lib/actions/settings";
 import { GrowthChart, ChurnCard } from "./dashboard-charts";
+import { requireAuth } from "@/lib/auth";
 
 export default async function Dashboard() {
+  await requireAuth();
   const stats = await getDashboardStats();
   const settingsData = await getSettings();
   const primaryColor = settingsData?.primary_color || "#003366";

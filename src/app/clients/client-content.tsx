@@ -74,9 +74,13 @@ export default function ClientPageContent({
     });
 
     async function handleAddClient(formData: FormData) {
-        await createClient(formData);
-        setIsAddClientOpen(false);
-        toast.success("Cliente aggiunto con successo!");
+        const result = await createClient(formData);
+        if (result?.success) {
+            setIsAddClientOpen(false);
+            toast.success("Cliente aggiunto con successo!");
+        } else {
+            toast.error(result?.error || "Errore durante la creazione del cliente");
+        }
     }
 
     async function handleAddSubscription(e: React.FormEvent<HTMLFormElement>) {

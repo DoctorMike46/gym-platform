@@ -3,11 +3,13 @@
 import { db } from "@/db";
 import { exercises } from "@/db/schema";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
+import { getAuthenticatedTrainer } from "@/lib/auth";
 
 export async function getExercises() {
+    const trainer = await getAuthenticatedTrainer();
     try {
-        const allExercises = await db.select().from(exercises);
+        const allExercises = await db.select().from(exercises).where(eq(exercises.trainer_id, trainer.id));
         return allExercises;
     } catch (error) {
         console.error("Errore nel recupero esercizi:", error);
@@ -16,6 +18,7 @@ export async function getExercises() {
 }
 
 export async function createExercise(formData: FormData) {
+    const trainer = await getAuthenticatedTrainer();
     try {
         const nome = formData.get("nome") as string;
         const gruppo_muscolare = formData.get("gruppo_muscolare") as string;
@@ -36,6 +39,7 @@ export async function createExercise(formData: FormData) {
         }
 
         await db.insert(exercises).values({
+            trainer_id: trainer.id,
             nome,
             gruppo_muscolare,
             video_url,
@@ -52,6 +56,7 @@ export async function createExercise(formData: FormData) {
 }
 
 export async function updateExercise(id: number, formData: FormData) {
+    const trainer = await getAuthenticatedTrainer();
     try {
         const nome = formData.get("nome") as string;
         const gruppo_muscolare = formData.get("gruppo_muscolare") as string;
@@ -74,7 +79,7 @@ export async function updateExercise(id: number, formData: FormData) {
             video_url,
             descrizione,
             istruzioni_step_by_step: istruzioni,
-        }).where(eq(exercises.id, id));
+        }).where(and(eq(exercises.id, id), eq(exercises.trainer_id, trainer.id)));
 
         revalidatePath("/exercises");
         return { success: true };
@@ -85,8 +90,9 @@ export async function updateExercise(id: number, formData: FormData) {
 }
 
 export async function deleteExercise(id: number) {
+    const trainer = await getAuthenticatedTrainer();
     try {
-        await db.delete(exercises).where(eq(exercises.id, id));
+        await db.delete(exercises).where(and(eq(exercises.id, id), eq(exercises.trainer_id, trainer.id)));
         revalidatePath("/exercises");
         return { success: true };
     } catch (error) {
