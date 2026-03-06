@@ -120,7 +120,66 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ── Brand color utilities ──────────────────────────────────────── */
+/* These classes use the CSS variables injected by layout.tsx,       */
+/* making the entire platform respond to settings color changes.     */
+
+.brand-bg {
+  background-color: var(--brand-primary, #003366) !important;
+}
+
+.brand-bg:hover {
+  filter: brightness(1.15);
+}
+
+.brand-text {
+  color: var(--brand-primary, #003366) !important;
+}
+
+.brand-border {
+  border-color: var(--brand-primary, #003366) !important;
+}
+
+.brand-hover-bg:hover {
+  background-color: color-mix(in srgb, var(--brand-primary, #003366) 10%, transparent) !important;
+}
+
+.brand-hover-text:hover {
+  color: var(--brand-primary, #003366) !important;
+}
+
+.brand-hover-border:hover {
+  border-color: var(--brand-primary, #003366) !important;
+}
+
+.brand-spin-border {
+  border-color: var(--brand-primary, #003366);
+  border-top-color: transparent;
+}
+
+.brand-sidebar-bg {
+  background: linear-gradient(135deg, var(--brand-sidebar, #003366)e6, #1e3a8acc) !important;
+}
+
+/* ── Tooltip brand color ────────────────────────────────────────── */
+[data-slot="tooltip-content"] {
+  background-color: var(--brand-primary, #003366) !important;
+  color: #fff !important;
+}
+
+[data-slot="tooltip-content"] svg {
+  fill: var(--brand-primary, #003366) !important;
+  color: var(--brand-primary, #003366) !important;
+}
+
+/* ── Checkbox brand color fallback ──────────────────────────────── */
+[data-slot="checkbox"][data-state="checked"] {
+  background-color: var(--brand-primary, #003366) !important;
+  border-color: var(--brand-primary, #003366) !important;
 }

@@ -18,8 +18,23 @@ export default async function RootLayout({
 }>) {
   const settingsData = await getSettings();
 
+  const primaryColor = settingsData?.primary_color || "#003366";
+  const sidebarColor = settingsData?.sidebar_color || "#003366";
+  const secondaryColor = settingsData?.secondary_color || "#1e40af";
+
   return (
     <html lang="it">
+      <head>
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            :root {
+              --brand-primary: ${primaryColor};
+              --brand-sidebar: ${sidebarColor};
+              --brand-secondary: ${secondaryColor};
+            }
+          `
+        }} />
+      </head>
       <body className={inter.className}>
         <AppLayout settings={settingsData}>
           {children}

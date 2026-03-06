@@ -1,16 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Plus, Save, Download, Trash2, GripVertical, Search } from "lucide-react";
-import { createWorkoutTemplate } from "@/lib/actions/workouts";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Plus, Save, Download, Trash2, GripVertical, Search, ArrowLeft, ArrowUp, ArrowDown, Dumbbell } from "lucide-react";
+import { createWorkoutTemplate, updateWorkoutTemplate } from "@/lib/actions/workouts";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { generateWorkoutPDF } from "@/lib/pdf-generator";
+import { getSettings } from "@/lib/actions/settings";
 
 interface Exercise {
     id: number;
@@ -21,6 +25,8 @@ interface Exercise {
 interface WorkoutExercise {
     id: string; // unique local id
     exercise_id: number;
+    giorno: number;
+    ordine: number;
     nome: string;
     serie: string;
     ripetizioni: string;
@@ -29,16 +35,47 @@ interface WorkoutExercise {
     note_tecniche: string;
 }
 
-export default function BuilderContent({ availableExercises }: { availableExercises: Exercise[] }) {
+export default function BuilderContent({ availableExercises, initialTemplate }: { availableExercises: Exercise[], initialTemplate?: any }) {
     const router = useRouter();
     const [nomeTemplate, setNomeTemplate] = useState("");
-    const [split, setSplit] = useState(4);
+    const [split, setSplit] = useState(3); // Default a 3 giorni
     const [noteProgressione, setNoteProgressione] = useState("Aumento ripetizioni: +1-2 rip finché arrivi al top range, poi aumenta il carico");
+    const [activeTab, setActiveTab] = useState("1");
 
-    // Per ora gestiamo un singolo blocco di esercizi (Giorno 1) per semplicità, 
-    // espandibile a più tab/giorni in seguito
     const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
+    const [isAddExOpen, setIsAddExOpen] = useState(false);
+
+    // Effetto per pre-popolare i dati in Edit Mode
+    useEffect(() => {
+        if (initialTemplate) {
+            setNomeTemplate(initialTemplate.nome_template || "");
+            setSplit(initialTemplate.split_settimanale || 3);
+            setNoteProgressione(initialTemplate.note_progressione || "");
+
+            if (initialTemplate.exercises && Array.isArray(initialTemplate.exercises)) {
+                const mappedEx: WorkoutExercise[] = initialTemplate.exercises.map((templateEx: any) => ({
+                    id: Math.random().toString(36).substr(2, 9),
+                    exercise_id: templateEx.exercise_id,
+                    giorno: templateEx.giorno,
+                    ordine: templateEx.ordine,
+                    nome: templateEx.exercise?.nome || "Esercizio rimosso",
+                    serie: templateEx.serie || "",
+                    ripetizioni: templateEx.ripetizioni || "",
+                    recupero: templateEx.recupero || "",
+                    rpe: templateEx.rpe || "",
+                    note_tecniche: templateEx.note_tecniche || "",
+                }));
+                // Sort array to ensure order is respected
+                mappedEx.sort((a, b) => {
+                    if (a.giorno === b.giorno) return a.ordine - b.ordine;
+                    return a.giorno - b.giorno;
+                });
+
+                setExercises(mappedEx);
+            }
+        }
+    }, [initialTemplate]);
 
     const filteredExercises = availableExercises.filter(ex =>
         ex.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -46,25 +83,73 @@ export default function BuilderContent({ availableExercises }: { availableExerci
     );
 
     const addExercise = (ex: Exercise) => {
+        const currentGiorno = parseInt(activeTab);
+        const dayExercises = exercises.filter(e => e.giorno === currentGiorno);
+
         const newEx: WorkoutExercise = {
             id: Math.random().toString(36).substr(2, 9),
             exercise_id: ex.id,
+            giorno: currentGiorno,
+            ordine: dayExercises.length,
             nome: ex.nome,
             serie: "3",
-            ripetizioni: "10",
+            ripetizioni: "10-12",
             recupero: "90s",
             rpe: "8",
             note_tecniche: "",
         };
         setExercises([...exercises, newEx]);
+        setIsAddExOpen(false);
+        setSearchQuery("");
     };
 
-    const removeExercise = (id: string) => {
-        setExercises(exercises.filter(ex => ex.id !== id));
+    const removeExercise = (id: string, giorno: number) => {
+        setExercises(prev => {
+            const filtered = prev.filter(ex => ex.id !== id);
+            // Re-order the remaining in that day
+            const dayExs = filtered.filter(ex => ex.giorno === giorno).sort((a, b) => a.ordine - b.ordine);
+            dayExs.forEach((ex, index) => { ex.ordine = index; });
+            return [
+                ...filtered.filter(ex => ex.giorno !== giorno),
+                ...dayExs
+            ];
+        });
     };
 
     const updateExercise = (id: string, field: keyof WorkoutExercise, value: string) => {
         setExercises(exercises.map(ex => ex.id === id ? { ...ex, [field]: value } : ex));
+    };
+
+    const moveExercise = (id: string, giorno: number, direction: 'up' | 'down') => {
+        setExercises(prev => {
+            const dayExs = [...prev.filter(ex => ex.giorno === giorno)].sort((a, b) => a.ordine - b.ordine);
+            const idx = dayExs.findIndex(ex => ex.id === id);
+
+            if (direction === 'up' && idx > 0) {
+                // Swap with previous
+                const temp = dayExs[idx].ordine;
+                dayExs[idx].ordine = dayExs[idx - 1].ordine;
+                dayExs[idx - 1].ordine = temp;
+            } else if (direction === 'down' && idx < dayExs.length - 1) {
+                // Swap with next
+                const temp = dayExs[idx].ordine;
+                dayExs[idx].ordine = dayExs[idx + 1].ordine;
+                dayExs[idx + 1].ordine = temp;
+            }
+
+            return [
+                ...prev.filter(ex => ex.giorno !== giorno),
+                ...dayExs
+            ];
+        });
+    };
+
+    const handleSplitChange = (newSplit: number) => {
+        if (newSplit < 1) newSplit = 1;
+        setSplit(newSplit);
+        if (parseInt(activeTab) > newSplit) {
+            setActiveTab(newSplit.toString());
+        }
     };
 
     const handleSave = async () => {
@@ -83,6 +168,8 @@ export default function BuilderContent({ availableExercises }: { availableExerci
             note_progressione: noteProgressione,
             exercises: exercises.map(ex => ({
                 exercise_id: ex.exercise_id,
+                giorno: ex.giorno,
+                ordine: ex.ordine,
                 serie: ex.serie,
                 ripetizioni: ex.ripetizioni,
                 recupero: ex.recupero,
@@ -91,36 +178,87 @@ export default function BuilderContent({ availableExercises }: { availableExerci
             }))
         };
 
-        const result = await createWorkoutTemplate(payload);
+        let result;
+        if (initialTemplate?.id) {
+            result = await updateWorkoutTemplate(initialTemplate.id, payload);
+        } else {
+            result = await createWorkoutTemplate(payload);
+        }
+
         if (result.success) {
-            toast.success("Template salvato con successo!");
+            toast.success(initialTemplate ? "Template aggiornato con successo!" : "Template salvato con successo!");
             router.push("/workouts");
         } else {
             toast.error("Errore nel salvataggio");
         }
     };
 
+    const handleDownloadPDF = async () => {
+        if (!nomeTemplate || exercises.length === 0) {
+            toast.error("Salva o completa la scheda prima di esportare.");
+            return;
+        }
+        try {
+            toast.info("Generazione PDF in corso...");
+            const settings = await getSettings();
+
+            // Costruiamo un finto oggetto template formattato per il generatore PDF
+            // simulando la struttura del DB.
+            const currentTemplateObj = {
+                id: initialTemplate?.id || Date.now(),
+                nome_template: nomeTemplate,
+                split_settimanale: split,
+                note_progressione: noteProgressione,
+                exercises: exercises.map(ex => ({
+                    exercise_id: ex.exercise_id,
+                    giorno: ex.giorno,
+                    ordine: ex.ordine,
+                    serie: ex.serie,
+                    ripetizioni: ex.ripetizioni,
+                    recupero: ex.recupero,
+                    rpe: ex.rpe,
+                    note_tecniche: ex.note_tecniche,
+                    exercise: { nome: ex.nome }
+                }))
+            };
+
+            await generateWorkoutPDF(currentTemplateObj, settings);
+        } catch (error) {
+            console.error(error);
+            toast.error("Errore durante la generazione del PDF");
+        }
+    };
+
     return (
         <div className="space-y-6 max-w-5xl">
-            <div className="flex justify-between items-center">
-                <div>
+            {/* Header */}
+            <div className="flex items-center gap-4">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-slate-500 hover:text-slate-900"
+                    onClick={() => router.back()}
+                >
+                    <ArrowLeft size={20} />
+                </Button>
+                <div className="flex-1">
                     <h1 className="text-3xl font-bold text-slate-900">Workout Builder</h1>
-                    <p className="text-slate-500 mt-1">Crea una nuova scheda di allenamento professionale.</p>
+                    <p className="text-slate-500 mt-0.5">Crea una nuova scheda di allenamento professionale.</p>
                 </div>
                 <div className="flex gap-3">
-                    <Button variant="outline" className="text-slate-700 border-slate-300 bg-white hover:bg-slate-50 gap-2">
+                    <Button onClick={handleDownloadPDF} variant="outline" className="text-slate-700 border-slate-300 bg-white hover:bg-slate-50 gap-2">
                         <Download size={16} /> Esporta PDF
                     </Button>
-                    <Button onClick={handleSave} className="bg-[#003366] hover:bg-blue-900 text-white gap-2">
+                    <Button onClick={handleSave} className="brand-bg text-white gap-2">
                         <Save size={16} /> Salva Template
                     </Button>
                 </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Sidebar Info Scheda */}
+                {/* Sidebar Info */}
                 <div className="md:col-span-1 space-y-6">
-                    <Card className="bg-white border-slate-200 text-slate-900 shadow-sm">
+                    <Card className="bg-white border-slate-200 shadow-sm">
                         <CardHeader>
                             <CardTitle className="text-lg">Dettagli Generali</CardTitle>
                         </CardHeader>
@@ -135,18 +273,21 @@ export default function BuilderContent({ availableExercises }: { availableExerci
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="split">Sessioni a settimana</Label>
+                                <Label htmlFor="split">Sessioni a settimana (Split)</Label>
                                 <Input
                                     id="split"
                                     type="number"
+                                    min="1"
+                                    max="7"
                                     value={split}
-                                    onChange={(e) => setSplit(parseInt(e.target.value))}
+                                    onChange={(e) => handleSplitChange(parseInt(e.target.value))}
                                 />
+                                <p className="text-xs text-slate-500 mt-1">Aggiungerà i relativi giorni nel builder.</p>
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-white border-slate-200 text-slate-900 shadow-sm">
+                    <Card className="bg-white border-slate-200 shadow-sm">
                         <CardHeader>
                             <CardTitle className="text-lg">Regole Progressione</CardTitle>
                         </CardHeader>
@@ -160,127 +301,179 @@ export default function BuilderContent({ availableExercises }: { availableExerci
                     </Card>
                 </div>
 
-                {/* Builder Area */}
+                {/* Builder Area con Tabs */}
                 <div className="md:col-span-2 space-y-4">
-                    <Card className="bg-white border-slate-200 text-slate-900 shadow-sm min-h-[500px]">
-                        <CardHeader className="border-b border-slate-100 bg-slate-50/30">
-                            <div className="flex justify-between items-center">
-                                <CardTitle className="text-xl text-[#003366]">Esercizi in Programma</CardTitle>
+                    <Card className="bg-white border-slate-200 shadow-sm min-h-[500px]">
+                        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 
-                                <Dialog>
-                                    <DialogTrigger asChild>
-                                        <Button size="sm" className="bg-[#003366] text-white">
-                                            <Plus size={16} className="mr-2" /> Aggiungi Esercizio
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="max-w-md">
-                                        <DialogHeader>
-                                            <DialogTitle>Seleziona Esercizio</DialogTitle>
-                                        </DialogHeader>
-                                        <div className="space-y-4 pt-4">
-                                            <div className="relative">
-                                                <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
-                                                <Input
-                                                    placeholder="Cerca esercizio..."
-                                                    className="pl-8"
-                                                    value={searchQuery}
-                                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="max-h-[300px] overflow-y-auto space-y-1">
-                                                {filteredExercises.map(ex => (
-                                                    <button
-                                                        key={ex.id}
-                                                        onClick={() => addExercise(ex)}
-                                                        className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-100 flex justify-between items-center group"
-                                                    >
-                                                        <div>
-                                                            <div className="font-medium">{ex.nome}</div>
-                                                            <div className="text-xs text-slate-500">{ex.gruppo_muscolare}</div>
-                                                        </div>
-                                                        <Plus size={14} className="text-[#003366] opacity-0 group-hover:opacity-100" />
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </DialogContent>
-                                </Dialog>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="p-0">
-                            {exercises.length === 0 ? (
-                                <div className="flex flex-col items-center justify-center py-20 text-slate-400">
-                                    <p>Nessun esercizio aggiunto.</p>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-slate-100">
-                                    {exercises.map((ex, index) => (
-                                        <div key={ex.id} className="p-4 hover:bg-slate-50/50 group transition-colors">
-                                            <div className="flex gap-4 items-start">
-                                                <div className="mt-2 text-slate-300">
-                                                    <GripVertical size={20} />
-                                                </div>
-                                                <div className="flex-1 space-y-3">
-                                                    <div className="flex justify-between items-center">
-                                                        <span className="font-bold text-[#003366]">{index + 1}. {ex.nome}</span>
-                                                        <Button
-                                                            variant="ghost"
-                                                            size="icon"
-                                                            className="h-8 w-8 text-rose-500 hover:text-rose-700 hover:bg-rose-50"
-                                                            onClick={() => removeExercise(ex.id)}
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </Button>
-                                                    </div>
+                            <CardHeader className="border-b border-slate-100 bg-slate-50/30 pb-3">
+                                <div className="flex justify-between items-center mb-4">
+                                    <div className="flex-1 overflow-x-auto no-scrollbar">
+                                        <TabsList className="bg-slate-200/50">
+                                            {Array.from({ length: split }).map((_, i) => (
+                                                <TabsTrigger key={i + 1} value={(i + 1).toString()} className="data-[state=active]:brand-text data-[state=active]:font-semibold">
+                                                    Giorno {i + 1}
+                                                </TabsTrigger>
+                                            ))}
+                                        </TabsList>
+                                    </div>
 
-                                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                                        <div className="space-y-1">
-                                                            <Label className="text-[10px] uppercase text-slate-500 font-bold">Serie</Label>
-                                                            <Input
-                                                                size={1}
-                                                                className="h-8 text-sm"
-                                                                value={ex.serie}
-                                                                onChange={(e) => updateExercise(ex.id, "serie", e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <Label className="text-[10px] uppercase text-slate-500 font-bold">Ripetizioni</Label>
-                                                            <Input
-                                                                className="h-8 text-sm"
-                                                                value={ex.ripetizioni}
-                                                                onChange={(e) => updateExercise(ex.id, "ripetizioni", e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <Label className="text-[10px] uppercase text-slate-500 font-bold">Recupero</Label>
-                                                            <Input
-                                                                className="h-8 text-sm"
-                                                                value={ex.recupero}
-                                                                onChange={(e) => updateExercise(ex.id, "recupero", e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div className="space-y-1">
-                                                            <Label className="text-[10px] uppercase text-slate-500 font-bold">RPE</Label>
-                                                            <Input
-                                                                className="h-8 text-sm"
-                                                                value={ex.rpe}
-                                                                onChange={(e) => updateExercise(ex.id, "rpe", e.target.value)}
-                                                            />
-                                                        </div>
-                                                    </div>
+                                    <Dialog open={isAddExOpen} onOpenChange={setIsAddExOpen}>
+                                        <DialogTrigger asChild>
+                                            <Button size="sm" className="brand-bg text-white ml-2 flex-shrink-0">
+                                                <Plus size={16} className="mr-1.5" /> Esercizio
+                                            </Button>
+                                        </DialogTrigger>
+                                        <DialogContent className="max-w-md">
+                                            <DialogHeader>
+                                                <DialogTitle>Seleziona Esercizio (Giorno {activeTab})</DialogTitle>
+                                            </DialogHeader>
+                                            <div className="space-y-4 pt-4">
+                                                <div className="relative">
+                                                    <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
                                                     <Input
-                                                        placeholder="Note tecniche (es: pancia a terra, gomiti larghi...)"
-                                                        className="h-8 text-xs italic bg-slate-50/50 border-dashed"
-                                                        value={ex.note_tecniche}
-                                                        onChange={(e) => updateExercise(ex.id, "note_tecniche", e.target.value)}
+                                                        placeholder="Cerca per nome o gruppo muscolare..."
+                                                        className="pl-8"
+                                                        value={searchQuery}
+                                                        onChange={(e) => setSearchQuery(e.target.value)}
                                                     />
                                                 </div>
+                                                <div className="max-h-[300px] overflow-y-auto space-y-1">
+                                                    {filteredExercises.map(ex => (
+                                                        <button
+                                                            key={ex.id}
+                                                            onClick={() => addExercise(ex)}
+                                                            className="w-full text-left px-3 py-2 rounded-md hover:bg-slate-100 flex justify-between items-center group transition-colors"
+                                                        >
+                                                            <div>
+                                                                <div className="font-medium text-slate-800">{ex.nome}</div>
+                                                                <div className="text-xs text-slate-500">{ex.gruppo_muscolare}</div>
+                                                            </div>
+                                                            <Plus size={16} className="brand-text opacity-0 group-hover:opacity-100 transition-opacity" />
+                                                        </button>
+                                                    ))}
+                                                    {filteredExercises.length === 0 && (
+                                                        <p className="text-center text-slate-500 text-sm py-4">Nessun esercizio trovato.</p>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
+                                        </DialogContent>
+                                    </Dialog>
                                 </div>
-                            )}
-                        </CardContent>
+                            </CardHeader>
+
+                            <CardContent className="p-0">
+                                {Array.from({ length: split }).map((_, idx) => {
+                                    const giorno = idx + 1;
+                                    const dayExercises = exercises.filter(ex => ex.giorno === giorno).sort((a, b) => a.ordine - b.ordine);
+
+                                    return (
+                                        <TabsContent key={giorno} value={giorno.toString()} className="m-0 border-none outline-none">
+                                            {dayExercises.length === 0 ? (
+                                                <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+                                                    <Dumbbell size={32} className="opacity-20 mb-3" />
+                                                    <p>Nessun esercizio nel Giorno {giorno}.</p>
+                                                    <Button
+                                                        variant="link"
+                                                        className="brand-text mt-2 h-auto p-0"
+                                                        onClick={() => setIsAddExOpen(true)}
+                                                    >
+                                                        Clicca qui per aggiungerne uno
+                                                    </Button>
+                                                </div>
+                                            ) : (
+                                                <div className="divide-y divide-slate-100">
+                                                    {dayExercises.map((ex, index) => (
+                                                        <div key={ex.id} className="p-4 hover:bg-slate-50/50 group transition-colors">
+                                                            <div className="flex gap-3 items-start">
+                                                                {/* Controlli Ordinamento */}
+                                                                <div className="mt-1 flex flex-col items-center gap-0.5 text-slate-300">
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className={`h-6 w-6 rounded-sm ${index === 0 ? 'opacity-30 cursor-default' : 'hover:bg-slate-200 hover:text-slate-600'}`}
+                                                                        onClick={() => moveExercise(ex.id, ex.giorno, 'up')}
+                                                                        disabled={index === 0}
+                                                                    >
+                                                                        <ArrowUp size={14} />
+                                                                    </Button>
+                                                                    <GripVertical size={14} className="opacity-50" />
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className={`h-6 w-6 rounded-sm ${index === dayExercises.length - 1 ? 'opacity-30 cursor-default' : 'hover:bg-slate-200 hover:text-slate-600'}`}
+                                                                        onClick={() => moveExercise(ex.id, ex.giorno, 'down')}
+                                                                        disabled={index === dayExercises.length - 1}
+                                                                    >
+                                                                        <ArrowDown size={14} />
+                                                                    </Button>
+                                                                </div>
+
+                                                                <div className="flex-1 space-y-3">
+                                                                    <div className="flex justify-between items-center">
+                                                                        <span className="font-bold brand-text text-base">{index + 1}. {ex.nome}</span>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                                            onClick={() => removeExercise(ex.id, ex.giorno)}
+                                                                        >
+                                                                            <Trash2 size={16} />
+                                                                        </Button>
+                                                                    </div>
+
+                                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white border border-slate-100 p-2 rounded-lg shadow-sm">
+                                                                        <div className="space-y-1">
+                                                                            <Label className="text-[10px] uppercase text-slate-500 font-bold ml-1">Serie</Label>
+                                                                            <Input
+                                                                                className="h-8 text-sm font-medium"
+                                                                                value={ex.serie}
+                                                                                onChange={(e) => updateExercise(ex.id, "serie", e.target.value)}
+                                                                            />
+                                                                        </div>
+                                                                        <div className="space-y-1">
+                                                                            <Label className="text-[10px] uppercase text-slate-500 font-bold ml-1">Ripetizioni</Label>
+                                                                            <Input
+                                                                                className="h-8 text-sm font-medium"
+                                                                                value={ex.ripetizioni}
+                                                                                onChange={(e) => updateExercise(ex.id, "ripetizioni", e.target.value)}
+                                                                            />
+                                                                        </div>
+                                                                        <div className="space-y-1">
+                                                                            <Label className="text-[10px] uppercase text-slate-500 font-bold ml-1">Recupero</Label>
+                                                                            <Input
+                                                                                className="h-8 text-sm font-medium"
+                                                                                value={ex.recupero}
+                                                                                onChange={(e) => updateExercise(ex.id, "recupero", e.target.value)}
+                                                                            />
+                                                                        </div>
+                                                                        <div className="space-y-1">
+                                                                            <Label className="text-[10px] uppercase text-slate-500 font-bold ml-1">RPE / Buffer</Label>
+                                                                            <Input
+                                                                                className="h-8 text-sm font-medium"
+                                                                                value={ex.rpe}
+                                                                                onChange={(e) => updateExercise(ex.id, "rpe", e.target.value)}
+                                                                            />
+                                                                        </div>
+                                                                    </div>
+                                                                    <Input
+                                                                        placeholder="Note tecniche opzionali (es: usa bilanciere ez, fermo al petto 1s, ecc...)"
+                                                                        className="h-8 text-xs italic bg-slate-50/70 border-dashed text-slate-600 placeholder:text-slate-400 focus:bg-white focus:border-solid"
+                                                                        value={ex.note_tecniche}
+                                                                        onChange={(e) => updateExercise(ex.id, "note_tecniche", e.target.value)}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </TabsContent>
+                                    );
+                                })}
+                            </CardContent>
+
+                        </Tabs>
                     </Card>
                 </div>
             </div>

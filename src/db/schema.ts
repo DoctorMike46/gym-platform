@@ -10,7 +10,22 @@ export const settings = pgTable("settings", {
   primary_color: text("primary_color").default("#003366").notNull(),
   sidebar_color: text("sidebar_color").default("#003366").notNull(),
   secondary_color: text("secondary_color"),
+  // PDF Customizable Texts
+  pdf_services_intro_title: text("pdf_services_intro_title"),
+  pdf_services_intro_text: text("pdf_services_intro_text"),
+  pdf_services_rules: text("pdf_services_rules"),
+  pdf_services_start: text("pdf_services_start"),
+  pdf_workouts_footer: text("pdf_workouts_footer"),
 });
+
+export const trainers = pgTable("trainers", {
+  id: serial("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  password_hash: text("password_hash").notNull(),
+  nome: text("nome"),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+});
+
 
 export const clients = pgTable("clients", {
   id: serial("id").primaryKey(),
@@ -48,6 +63,8 @@ export const workout_template_exercises = pgTable("workout_template_exercises", 
   id: serial("id").primaryKey(),
   template_id: integer("template_id").references(() => workout_templates.id, { onDelete: 'cascade' }).notNull(),
   exercise_id: integer("exercise_id").references(() => exercises.id, { onDelete: 'cascade' }).notNull(),
+  giorno: integer("giorno").default(1).notNull(), // Per supportare split multi-giorno
+  ordine: integer("ordine").default(0).notNull(), // Per supportare riordino
   serie: text("serie"),
   ripetizioni: text("ripetizioni"),
   recupero: text("recupero"),
@@ -58,10 +75,13 @@ export const workout_template_exercises = pgTable("workout_template_exercises", 
 export const services = pgTable("services", {
   id: serial("id").primaryKey(),
   nome_servizio: text("nome_servizio").notNull(),
+  categoria: text("categoria").default("Generale").notNull(),
   prezzo: integer("prezzo").notNull(),
   descrizione_breve: text("descrizione_breve"),
+  caratteristiche: text("caratteristiche"), // Testo a capo = lista bullet
   durata_settimane: integer("durata_settimane"),
   include_coaching: boolean("include_coaching").default(false),
+  is_active: boolean("is_active").default(true).notNull(),
 });
 
 export const subscriptions = pgTable("subscriptions", {
@@ -71,6 +91,15 @@ export const subscriptions = pgTable("subscriptions", {
   data_inizio: date("data_inizio").notNull(),
   data_fine: date("data_fine"),
   status: text("status").default("attivo").notNull(),
+});
+
+export const client_workout_assignments = pgTable("client_workout_assignments", {
+  id: serial("id").primaryKey(),
+  client_id: integer("client_id").references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+  template_id: integer("template_id").references(() => workout_templates.id, { onDelete: 'cascade' }).notNull(),
+  data_assegnazione: date("data_assegnazione").defaultNow().notNull(),
+  note: text("note"),
+  attivo: boolean("attivo").default(true).notNull(),
 });
 
 export const documents = pgTable("documents", {
@@ -84,6 +113,17 @@ export const documents = pgTable("documents", {
 // Relations
 export const clientsRelations = relations(clients, ({ many }) => ({
   subscriptions: many(subscriptions),
+  workout_assignments: many(client_workout_assignments),
+}));
+
+export const workoutTemplatesRelations = relations(workout_templates, ({ many }) => ({
+  exercises: many(workout_template_exercises),
+  assignments: many(client_workout_assignments),
+}));
+
+export const clientWorkoutAssignmentsRelations = relations(client_workout_assignments, ({ one }) => ({
+  client: one(clients, { fields: [client_workout_assignments.client_id], references: [clients.id] }),
+  template: one(workout_templates, { fields: [client_workout_assignments.template_id], references: [workout_templates.id] }),
 }));
 
 export const workoutTemplateExercisesRelations = relations(workout_template_exercises, ({ one }) => ({

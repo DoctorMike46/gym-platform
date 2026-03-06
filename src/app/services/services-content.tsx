@@ -6,14 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import {
     Dialog,
     DialogContent,
@@ -21,112 +15,308 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Tag } from "lucide-react";
-import { createService } from "@/lib/actions/services";
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { Plus, Tag, Edit2, Trash2, CheckCircle2, Download } from "lucide-react";
+import { createService, updateService, deleteService } from "@/lib/actions/services";
+import { getSettings } from "@/lib/actions/settings";
+import { generateServicesPDF } from "@/lib/pdf-generator";
 import { toast } from "sonner";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function ServicesPageClient({ servicesData }: { servicesData: any[] }) {
-    const [open, setOpen] = useState(false);
+    // Dialog state
+    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
-    async function handleAction(formData: FormData) {
-        await createService(formData);
-        setOpen(false);
-        toast.success("Servizio aggiunto con successo!");
+    // Form state
+    const [editingService, setEditingService] = useState<any>(null);
+    const [deletingId, setDeletingId] = useState<number | null>(null);
+
+    // Grouping
+    const groupedServices = servicesData.reduce((acc: any, service: any) => {
+        const cat = service.categoria || "Generale";
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(service);
+        return acc;
+    }, {});
+
+    const categorieDisponibili = ["Coaching Online", "Schede Preimpostate", "Consulenza Singola", "Personal Training", "Altro"];
+
+    async function handleSave(formData: FormData) {
+        if (editingService) {
+            const res = await updateService(editingService.id, formData);
+            if (res.success) toast.success("Servizio aggiornato!");
+            else toast.error("Errore durante l'aggiornamento.");
+        } else {
+            const res = await createService(formData);
+            if (res.success) toast.success("Servizio creato con successo!");
+            else toast.error("Errore durante la creazione.");
+        }
+        setIsFormOpen(false);
+        setEditingService(null);
+    }
+
+    async function handleDeleteConfirmed() {
+        if (!deletingId) return;
+        const res = await deleteService(deletingId);
+        if (res.success) toast.success("Servizio eliminato.");
+        else toast.error("Errore durante l'eliminazione.");
+        setIsDeleteOpen(false);
+        setDeletingId(null);
+    }
+
+    function openEdit(service: any) {
+        setEditingService(service);
+        setIsFormOpen(true);
+    }
+
+    function openCreate() {
+        setEditingService(null);
+        setIsFormOpen(true);
+    }
+
+    function confirmDelete(id: number) {
+        setDeletingId(id);
+        setIsDeleteOpen(true);
+    }
+
+    async function handleExportPDF() {
+        if (servicesData.length === 0) {
+            toast.error("Nessun servizio nel listino da esportare.");
+            return;
+        }
+        try {
+            toast.info("Generazione Listino in corso...");
+            const settings = await getSettings();
+            await generateServicesPDF(servicesData, settings);
+        } catch (error) {
+            console.error("Errore export services:", error);
+            toast.error("Errore durante l'esportazione del listino.");
+        }
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Servizi & Abbonamenti</h1>
-                    <p className="text-slate-500 mt-1">Configura i pacchetti e il listino prezzi per i tuoi atleti.</p>
-                </div>
+        <TooltipProvider delayDuration={300}>
+            <div className="space-y-8">
+                {/* Header */}
+                <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                    <div>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Servizi & Listino</h1>
+                        <p className="text-slate-500 mt-1">Gestisci i pacchetti di allenamento e i piani in vendita.</p>
+                    </div>
 
-                <Dialog open={open} onOpenChange={setOpen}>
-                    <DialogTrigger asChild>
-                        <Button className="bg-[#003366] hover:bg-blue-900 text-white gap-2">
+                    <div className="flex gap-3">
+                        <Button variant="outline" className="text-slate-700 bg-white hover:bg-slate-50 border-slate-200" onClick={handleExportPDF}>
+                            <Download size={16} className="mr-2" />
+                            Esporta Listino
+                        </Button>
+                        <Button className="brand-bg text-white gap-2 shadow-sm" onClick={openCreate}>
                             <Plus size={16} /> Nuovo Servizio
                         </Button>
-                    </DialogTrigger>
-                    <DialogContent className="sm:max-w-[425px]">
-                        <form action={handleAction}>
+                    </div>
+                </div>
+
+                {/* Form Dialog */}
+                <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
+                    <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+                        <form action={handleSave}>
                             <DialogHeader>
-                                <DialogTitle>Nuovo Servizio</DialogTitle>
+                                <DialogTitle>{editingService ? "Modifica Servizio" : "Nuovo Servizio"}</DialogTitle>
                                 <DialogDescription>
-                                    Crea un nuovo pacchetto o servizio per il tuo listino.
+                                    Configura il listino e cosa comprende il pacchetto.
                                 </DialogDescription>
                             </DialogHeader>
-                            <div className="grid gap-4 py-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="nome_servizio">Nome Servizio</Label>
-                                    <Input id="nome_servizio" name="nome_servizio" placeholder="Es: Coaching Online Elite" required />
+                            <div className="grid gap-6 py-6">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="nome_servizio">Nome Pacchetto</Label>
+                                        <Input id="nome_servizio" name="nome_servizio" defaultValue={editingService?.nome_servizio} placeholder="Es: Elite Coaching" required />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="categoria">Categoria</Label>
+                                        <Select name="categoria" defaultValue={editingService?.categoria || "Coaching Online"}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Seleziona..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {categorieDisponibili.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
+
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="prezzo">Prezzo (€)</Label>
-                                        <Input id="prezzo" name="prezzo" type="number" step="0.01" placeholder="49.99" required />
+                                        <Input id="prezzo" name="prezzo" type="number" step="0.01" defaultValue={editingService ? (editingService.prezzo / 100).toFixed(2) : ""} placeholder="99.00" required />
                                     </div>
                                     <div className="space-y-2">
-                                        <Label htmlFor="durata_settimane">Durata (Sett.)</Label>
-                                        <Input id="durata_settimane" name="durata_settimane" type="number" placeholder="4" />
+                                        <Label htmlFor="durata_settimane">Durata (Settimane)</Label>
+                                        <Input id="durata_settimane" name="durata_settimane" type="number" defaultValue={editingService?.durata_settimane || ""} placeholder="Es: 4 (lascia vuoto se singolo)" />
                                     </div>
                                 </div>
+
                                 <div className="space-y-2">
-                                    <Label htmlFor="descrizione_breve">Descrizione Breve</Label>
-                                    <Textarea id="descrizione_breve" name="descrizione_breve" placeholder="Breve elenco di cosa include..." />
+                                    <Label htmlFor="descrizione_breve">Sottotitolo / Descrizione Corta</Label>
+                                    <Input id="descrizione_breve" name="descrizione_breve" defaultValue={editingService?.descrizione_breve || ""} placeholder="Ideale per intermedi o atleti avanzati..." />
                                 </div>
-                                <div className="flex items-center space-x-2 pt-2">
-                                    <Checkbox id="include_coaching" name="include_coaching" />
-                                    <Label htmlFor="include_coaching" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                                        Include coaching 1-to-1
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="caratteristiche">Lista Caratteristiche (una per riga)</Label>
+                                    <Textarea
+                                        id="caratteristiche"
+                                        name="caratteristiche"
+                                        className="h-32"
+                                        defaultValue={editingService?.caratteristiche || "Scheda 100% Personalizzata\nCheck settimanale video\nSupporto WhatsApp H24"}
+                                        placeholder="Inserisci i bullet points del servizio..."
+                                    />
+                                    <p className="text-xs text-slate-500 mt-1">Ogni riga diventerà un punto elenco nel PDF e nella card.</p>
+                                </div>
+
+                                <div className="flex items-center space-x-2 pt-2 border-t border-slate-100">
+                                    <Checkbox id="include_coaching" name="include_coaching" defaultChecked={editingService?.include_coaching} />
+                                    <Label htmlFor="include_coaching" className="text-sm font-medium leading-none cursor-pointer">
+                                        Include affiancamento 1-to-1 (Coaching Attivo)
                                     </Label>
                                 </div>
                             </div>
                             <DialogFooter>
-                                <Button type="submit" className="bg-[#003366] text-white w-full">Salva Servizio</Button>
+                                <Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Annulla</Button>
+                                <Button type="submit" className="brand-bg text-white">
+                                    {editingService ? "Salva Modifiche" : "Crea Servizio"}
+                                </Button>
                             </DialogFooter>
                         </form>
                     </DialogContent>
                 </Dialog>
-            </div>
 
-            <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
-                <Table>
-                    <TableHeader className="bg-slate-50">
-                        <TableRow className="hover:bg-slate-50 border-slate-200">
-                            <TableHead className="text-slate-700 font-semibold w-[300px]">Nome Servizio</TableHead>
-                            <TableHead className="text-slate-700 font-semibold">Descrizione</TableHead>
-                            <TableHead className="text-slate-700 font-semibold">Durata</TableHead>
-                            <TableHead className="text-slate-700 font-semibold">Prezzo</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {servicesData.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={4} className="text-center py-12 text-slate-500">
-                                    <div className="flex flex-col items-center gap-2">
-                                        <Tag className="h-8 w-8 opacity-20" />
-                                        <p>Nessun servizio nel listino al momento.</p>
+                {/* Confirm Delete Dialog */}
+                <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Sei sicuro?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Questo disattiverà il pacchetto. I clienti che hanno attualmente questo abbonamento
+                                continueranno ad averlo fino a scadenza, ma non potrà essere più assegnato a nuovi atleti.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Annulla</AlertDialogCancel>
+                            <AlertDialogAction className="bg-rose-600 hover:bg-rose-700 text-white" onClick={handleDeleteConfirmed}>
+                                Conferma Eliminazione
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
+
+                {/* Display Services grouped by category */}
+                {Object.keys(groupedServices).length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-16 bg-white border border-slate-200 border-dashed rounded-xl shadow-sm">
+                        <Tag className="h-12 w-12 text-slate-300 mb-4" />
+                        <h3 className="text-lg font-medium text-slate-900 mb-1">Nessun servizio nel listino</h3>
+                        <p className="text-slate-500 mb-6 text-center max-w-md">Crea il tuo primo pacchetto o servizio per poterlo assegnare ai tuoi clienti.</p>
+                        <Button className="brand-bg text-white shadow-sm" onClick={openCreate}>Inizia Ora</Button>
+                    </div>
+                ) : (
+                    <div className="space-y-10">
+                        {categorieDisponibili.map(cat => {
+                            const svcs = groupedServices[cat];
+                            if (!svcs) return null;
+
+                            return (
+                                <div key={cat} className="space-y-4">
+                                    <h2 className="text-xl font-bold text-slate-800 border-b border-slate-200 pb-2">{cat}</h2>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                                        {svcs.map((service: any) => (
+                                            <Card key={service.id} className="relative bg-white shadow-sm hover:shadow-md transition-shadow border-slate-200 group flex flex-col">
+                                                <CardHeader className="pb-4 border-b border-slate-50">
+                                                    <div className="flex justify-between items-start">
+                                                        <div>
+                                                            <CardTitle className="text-lg font-bold brand-text">{service.nome_servizio}</CardTitle>
+                                                            {service.descrizione_breve && (
+                                                                <p className="text-sm text-slate-500 mt-1 line-clamp-2">{service.descrizione_breve}</p>
+                                                            )}
+                                                        </div>
+                                                        <div className="bg-slate-50 text-slate-700 px-3 py-1 rounded-lg border border-slate-100 font-bold whitespace-nowrap">
+                                                            €{(service.prezzo / 100).toFixed(2)}
+                                                        </div>
+                                                    </div>
+                                                </CardHeader>
+
+                                                <CardContent className="pt-4 flex-1">
+                                                    <div className="space-y-3">
+                                                        {service.durata_settimane && (
+                                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium">
+                                                                Durata: {service.durata_settimane} Settimane
+                                                            </Badge>
+                                                        )}
+                                                        {service.include_coaching && (
+                                                            <Badge variant="outline" className="ml-2 bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">
+                                                                Coaching Incluso
+                                                            </Badge>
+                                                        )}
+
+                                                        {service.caratteristiche && (
+                                                            <ul className="mt-4 space-y-2">
+                                                                {service.caratteristiche.split('\n').map((feat: string, i: number) => {
+                                                                    if (!feat.trim()) return null;
+                                                                    return (
+                                                                        <li key={i} className="flex items-start text-sm text-slate-600">
+                                                                            <CheckCircle2 size={14} className="mr-2 mt-0.5 brand-text opacity-70 flex-shrink-0" />
+                                                                            <span className="leading-tight">{feat.trim()}</span>
+                                                                        </li>
+                                                                    )
+                                                                })}
+                                                            </ul>
+                                                        )}
+                                                    </div>
+                                                </CardContent>
+
+                                                {/* Actions */}
+                                                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-slate-100 flex items-center gap-1">
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600" onClick={() => openEdit(service)}>
+                                                                <Edit2 size={14} />
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>Modifica pacchetto</TooltipContent>
+                                                    </Tooltip>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-rose-600 hover:bg-rose-50" onClick={() => confirmDelete(service.id)}>
+                                                                <Trash2 size={14} />
+                                                            </Button>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>Disattiva pacchetto</TooltipContent>
+                                                    </Tooltip>
+                                                </div>
+                                            </Card>
+                                        ))}
                                     </div>
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            servicesData.map((service) => (
-                                <TableRow key={service.id} className="border-slate-200 hover:bg-slate-50 text-slate-800">
-                                    <TableCell className="font-semibold text-[#003366]">{service.nome_servizio}</TableCell>
-                                    <TableCell className="text-slate-500 text-sm max-w-[400px] truncate">{service.descrizione_breve || "-"}</TableCell>
-                                    <TableCell className="text-slate-700">
-                                        {service.durata_settimane ? `${service.durata_settimane} Settimane` : 'Singolo'}
-                                    </TableCell>
-                                    <TableCell className="font-bold text-slate-900">€{(service.prezzo / 100).toFixed(2)}</TableCell>
-                                </TableRow>
-                            ))
-                        )}
-                    </TableBody>
-                </Table>
+                                </div>
+                            );
+                        })}
+                    </div>
+                )}
             </div>
-        </div>
+        </TooltipProvider>
     );
 }
