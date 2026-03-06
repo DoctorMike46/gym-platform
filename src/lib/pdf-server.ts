@@ -13,11 +13,11 @@ export async function generateWorkoutPDFBuffer(
 ): Promise<Buffer> {
     let PdfPrinter;
     try {
-        // In version 0.3.x, the printer class is in js/printer.js
-        PdfPrinter = require('pdfmake/js/printer').default;
+        // Fix for Vercel build: path is case-sensitive and 'Printer' is capitalized
+        PdfPrinter = require('pdfmake/js/Printer').default || require('pdfmake/js/Printer');
     } catch (e) {
         console.warn("Fallback for pdfmake require path");
-        const mod = require('pdfmake/js/printer');
+        const mod = require('pdfmake/js/Printer');
         PdfPrinter = mod.default || mod;
     }
 
@@ -25,9 +25,9 @@ export async function generateWorkoutPDFBuffer(
         throw new Error(`PdfPrinter is not a constructor (type: ${typeof PdfPrinter})`);
     }
 
-    // Configurazione font
+    // Configurazione font - Using project-local fonts to ensure Vercel bundles them
     const path = require('path');
-    const fontsDir = path.join(process.cwd(), 'node_modules', 'pdfmake', 'fonts', 'Roboto');
+    const fontsDir = path.join(process.cwd(), 'src', 'assets', 'fonts', 'Roboto');
 
     const fonts = {
         Roboto: {
