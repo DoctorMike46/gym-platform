@@ -19,9 +19,18 @@ export default async function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
-          <p className="text-slate-500 mt-1">Benvenuto, Coach! Ecco una panoramica della tua attività.</p>
+        <div className="flex items-center gap-4">
+          {settingsData?.logo_url ? (
+            <img
+              src={settingsData.logo_url}
+              alt={settingsData?.site_name || "Logo"}
+              className="h-16 w-auto object-contain"
+            />
+          ) : null}
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+            <p className="text-slate-500 mt-1">Benvenuto, Coach! Ecco una panoramica della tua attività.</p>
+          </div>
         </div>
         <div className="flex gap-4">
           <Link href="/clients">

@@ -3,7 +3,7 @@
 import { db } from "@/db";
 import { services } from "@/db/schema";
 import { revalidatePath } from "next/cache";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, asc } from "drizzle-orm";
 import { getAuthenticatedTrainer } from "@/lib/auth";
 
 export async function getServices() {
@@ -11,7 +11,7 @@ export async function getServices() {
     try {
         return await db.select().from(services)
             .where(and(eq(services.is_active, true), eq(services.trainer_id, trainer.id)))
-            .orderBy(desc(services.id));
+            .orderBy(asc(services.prezzo));
     } catch (error) {
         console.error("Errore nel recupero servizi:", error);
         return [];

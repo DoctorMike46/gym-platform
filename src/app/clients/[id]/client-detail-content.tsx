@@ -35,6 +35,7 @@ import { assignWorkoutToClient, removeWorkoutFromClient, toggleWorkoutActive } f
 import { getWorkoutTemplateWithExercises } from "@/lib/actions/workouts";
 import { getSettings } from "@/lib/actions/settings";
 import { generateWorkoutPDF } from "@/lib/pdf-generator";
+import { uploadDocument } from "@/lib/actions/documents";
 import { toast } from "sonner";
 
 export default function ClientDetailContent({
@@ -59,7 +60,45 @@ export default function ClientDetailContent({
     // Workouts
     const [isAssignWorkoutOpen, setIsAssignWorkoutOpen] = useState(false);
 
+    // Anamnesi upload
+    const [isAnamnesiOpen, setIsAnamnesiOpen] = useState(false);
+    const [anamnesiFile, setAnamnesiFile] = useState<File | null>(null);
+    const [anamnesiNote, setAnamnesiNote] = useState("");
+    const [anamnesiUploading, setAnamnesiUploading] = useState(false);
+
     const activeSub = client.subscriptions?.find((s: any) => s.status === "attivo");
+
+    async function handleUploadAnamnesi(e: React.FormEvent<HTMLFormElement>) {
+        e.preventDefault();
+        if (!anamnesiFile) {
+            toast.error("Seleziona un file");
+            return;
+        }
+        setAnamnesiUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append("file", anamnesiFile);
+            fd.append("client_id", client.id.toString());
+            fd.append("tipo_documento", "consenso");
+            fd.append("data_documento", new Date().toISOString().split("T")[0]);
+            if (anamnesiNote) fd.append("note", anamnesiNote);
+
+            const result = await uploadDocument(fd);
+            if (result.success) {
+                toast.success("Anamnesi caricata con successo!");
+                setIsAnamnesiOpen(false);
+                setAnamnesiFile(null);
+                setAnamnesiNote("");
+                router.refresh();
+            } else {
+                toast.error(result.error || "Errore durante l'upload");
+            }
+        } catch {
+            toast.error("Errore imprevisto durante l'upload");
+        } finally {
+            setAnamnesiUploading(false);
+        }
+    }
 
     // Profile Handlers
     async function handleEdit(e: React.FormEvent<HTMLFormElement>) {
@@ -503,13 +542,27 @@ export default function ClientDetailContent({
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-sm text-slate-600">Anamnesi</span>
-                                    <div className="flex items-center gap-1.5">
+                                    <div className="flex items-center gap-2">
                                         {client.anamnesi_status === "firmato" ? (
-                                            <><CheckCircle2 size={14} className="text-emerald-500" />
-                                                <span className="text-sm text-emerald-600 font-medium">Firmata</span></>
+                                            <div className="flex items-center gap-1.5">
+                                                <CheckCircle2 size={14} className="text-emerald-500" />
+                                                <span className="text-sm text-emerald-600 font-medium">Firmata</span>
+                                            </div>
                                         ) : (
-                                            <><XCircle size={14} className="text-slate-400" />
-                                                <span className="text-sm text-slate-400">Non firmata</span></>
+                                            <>
+                                                <div className="flex items-center gap-1.5">
+                                                    <XCircle size={14} className="text-slate-400" />
+                                                    <span className="text-sm text-slate-400">Non firmata</span>
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="h-7 px-2 text-xs brand-text brand-border"
+                                                    onClick={() => setIsAnamnesiOpen(true)}
+                                                >
+                                                    <Plus size={12} className="mr-1" /> Aggiungi
+                                                </Button>
+                                            </>
                                         )}
                                     </div>
                                 </div>
@@ -547,6 +600,49 @@ export default function ClientDetailContent({
                         </Card>
                     </div>
                 </div>
+
+                {/* Dialog Aggiungi Anamnesi */}
+                <Dialog open={isAnamnesiOpen} onOpenChange={setIsAnamnesiOpen}>
+                    <DialogContent className="sm:max-w-[500px]">
+                        <form onSubmit={handleUploadAnamnesi}>
+                            <DialogHeader>
+                                <DialogTitle>Aggiungi Anamnesi</DialogTitle>
+                                <DialogDescription>
+                                    Carica il PDF del consenso informato o dell'anamnesi firmata.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="grid gap-4 py-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="anamnesi-file">File</Label>
+                                    <Input
+                                        id="anamnesi-file"
+                                        type="file"
+                                        accept="application/pdf,image/*"
+                                        onChange={(e) => setAnamnesiFile(e.target.files?.[0] || null)}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="anamnesi-note">Note (opzionale)</Label>
+                                    <Input
+                                        id="anamnesi-note"
+                                        value={anamnesiNote}
+                                        onChange={(e) => setAnamnesiNote(e.target.value)}
+                                        placeholder="Es: firmata in sede il..."
+                                    />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setIsAnamnesiOpen(false)}>
+                                    Annulla
+                                </Button>
+                                <Button type="submit" className="brand-bg text-white" disabled={anamnesiUploading}>
+                                    {anamnesiUploading ? "Caricamento..." : "Carica anamnesi"}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Dialog Modifica Profilo */}
                 <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>

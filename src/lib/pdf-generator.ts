@@ -214,14 +214,14 @@ export const generateServicesPDF = async (
     });
 
     content.push({
-        text: "Listino Servizi",
+        text: "Info e costi",
         style: 'header',
         alignment: 'center',
         margin: [0, 0, 0, 10]
     });
 
     // Introduzione testuale (dynamic)
-    const introText = trainerSettings?.pdf_services_intro_text || "Questo documento ti spiega in modo semplice cosa include ogni servizio, quanto costa e come funziona (regole, check‑in, modifiche, pagamenti). Così scegli subito il percorso più adatto.";
+    const introText = trainerSettings?.pdf_services_intro_text || "Scegli subito il percorso più adatto alle tue esigenze.";
     content.push({
         text: introText,
         style: 'introText',
@@ -248,19 +248,15 @@ export const generateServicesPDF = async (
                 ],
                 [
                     { text: 'Un programma da seguire in autonomia', style: 'tableCellLeft' },
-                    { text: 'Scheda Personalizzata (una tantum)', style: 'tableCellRightBold' }
+                    { text: 'Scheda Personalizzata', style: 'tableCellRightBold' }
                 ],
                 [
                     { text: 'Essere seguito mese per mese con aggiornamenti', style: 'tableCellLeftAlt' },
-                    { text: 'Coaching Online 1:1 (mensile)', style: 'tableCellRightBoldAlt' }
+                    { text: 'Coaching Online 1:1', style: 'tableCellRightBoldAlt' }
                 ],
                 [
                     { text: 'Migliorare tecnica e sicurezza dal vivo', style: 'tableCellLeft' },
                     { text: 'Lezione PT in palestra (a seduta o pacchetto)', style: 'tableCellRightBold' }
-                ],
-                [
-                    { text: 'Allenarti a casa con assistenza', style: 'tableCellLeftAlt' },
-                    { text: 'Lezione a casa (a seduta)', style: 'tableCellRightBoldAlt' }
                 ]
             ]
         },
@@ -268,74 +264,54 @@ export const generateServicesPDF = async (
         margin: [0, 10, 0, 40]
     });
 
-    // Grouping
-    const groupedServices = servicesData.reduce((acc: any, service: any) => {
-        const cat = service.categoria || "Generale";
-        if (!acc[cat]) acc[cat] = [];
-        acc[cat].push(service);
-        return acc;
-    }, {});
-
-
-    // Generazione Categorie
-    Object.keys(groupedServices).sort().forEach((cat) => {
-        content.push({
-            text: cat.toUpperCase(),
-            style: 'categoryTitle',
-            margin: [0, 20, 0, 10]
-        });
-
-        groupedServices[cat].forEach((service: any) => {
-            // Contenitore per un singolo servizio
-            const serviceBlock: any[] = [
-                {
-                    columns: [
-                        { text: service.nome_servizio, style: 'serviceName', width: '*' },
-                        { text: `€${(service.prezzo / 100).toFixed(2)}`, style: 'servicePrice', width: 'auto' }
-                    ],
-                    margin: [0, 0, 0, 5]
-                }
-            ];
-
-            // Badges testuali
-            const infoLine = [];
-            if (service.durata_settimane) infoLine.push(`Durata: ${service.durata_settimane} Settimane`);
-            if (service.include_coaching) infoLine.push("Include Affiancamento (Coaching)");
-
-            if (infoLine.length > 0) {
-                serviceBlock.push({
-                    text: infoLine.join('  •  '),
-                    style: 'serviceInfo',
-                    margin: [0, 0, 0, 5]
-                });
+    // Lista servizi piatta (ordinata per prezzo crescente dalla query)
+    servicesData.forEach((service: any, index: number) => {
+        const serviceBlock: any[] = [
+            {
+                columns: [
+                    { text: service.nome_servizio, style: 'serviceName', width: '*' },
+                    { text: `€${(service.prezzo / 100).toFixed(2)}`, style: 'servicePrice', width: 'auto' }
+                ],
+                margin: [0, 0, 0, 5]
             }
+        ];
 
-            // Descrizione breve
-            if (service.descrizione_breve) {
-                serviceBlock.push({
-                    text: service.descrizione_breve,
-                    style: 'serviceDesc',
-                    margin: [0, 0, 0, 5]
-                });
-            }
+        // Badges testuali
+        const infoLine = [];
+        if (service.durata_settimane) infoLine.push(`Durata: ${service.durata_settimane} Settimane`);
+        if (service.include_coaching) infoLine.push("Include Affiancamento (Coaching)");
 
-            // Caratteristiche Bullet list
-            if (service.caratteristiche) {
-                const featureLines = service.caratteristiche.split('\n').filter((feat: string) => feat.trim());
-                if (featureLines.length > 0) {
-                    serviceBlock.push({
-                        ul: featureLines.map((feat: string) => ({ text: feat.trim(), style: 'bulletPoint' })),
-                        margin: [10, 5, 0, 10]
-                    });
-                }
-            }
-
-            content.push({
-                stack: serviceBlock,
-                margin: [0, 0, 0, 20], // Spazio inferiore prima del prox servizio
-                // linea separatrice opzionale in basso al servizio
-                // table: { widths: ['*'], body: [ [ { text: '', border: [false, false, false, true], borderColor: '#f1f5f9' } ] ] }, layout: 'noBorders'
+        if (infoLine.length > 0) {
+            serviceBlock.push({
+                text: infoLine.join('  •  '),
+                style: 'serviceInfo',
+                margin: [0, 0, 0, 5]
             });
+        }
+
+        // Descrizione breve
+        if (service.descrizione_breve) {
+            serviceBlock.push({
+                text: service.descrizione_breve,
+                style: 'serviceDesc',
+                margin: [0, 0, 0, 5]
+            });
+        }
+
+        // Caratteristiche Bullet list
+        if (service.caratteristiche) {
+            const featureLines = service.caratteristiche.split('\n').filter((feat: string) => feat.trim());
+            if (featureLines.length > 0) {
+                serviceBlock.push({
+                    ul: featureLines.map((feat: string) => ({ text: feat.trim(), style: 'bulletPoint' })),
+                    margin: [10, 5, 0, 10]
+                });
+            }
+        }
+
+        content.push({
+            stack: serviceBlock,
+            margin: [0, index === 0 ? 10 : 0, 0, 20]
         });
     });
 
@@ -360,10 +336,7 @@ export const generateServicesPDF = async (
         });
         content.push({
             ul: [
-                { text: [{ text: 'Tempi risposta chat: ', bold: true }, 'entro 24–48h (lun–ven).'], style: 'ruleItem' },
-                { text: [{ text: 'Check‑in: ', bold: true }, 'Coaching Standard settimanale.'], style: 'ruleItem' },
-                { text: [{ text: 'Modifiche: ', bold: true }, 'Coaching Standard 1–2/mese.'], style: 'ruleItem' },
-                { text: [{ text: 'Chat: ', bold: true }, 'non è 24/7; rispondo in finestre orarie dedicate per garantire massima qualità.'], style: 'ruleItem' },
+                { text: [{ text: 'Tempi risposta: ', bold: true }, 'entro 24–48h (lun–ven).'], style: 'ruleItem' },
                 { text: [{ text: 'Sicurezza e Salute: ', bold: true }, 'in caso di dolore insolito, si scala l\'intensità e, se necessario, si rimanda l\'atleta al medico o fisioterapista.'], style: 'ruleItem' }
             ],
             margin: [10, 0, 0, 20]
@@ -391,14 +364,23 @@ export const generateServicesPDF = async (
         });
         content.push({
             ol: [
-                { text: [{ text: 'Compila le tue Info: ', bold: true }, 'Mi mandi i tuoi dati base (età, altezza, peso, storico infortuni), il tuo obiettivo e dove ti alleni (casa o palestra).'], style: 'ruleItem' },
-                { text: [{ text: 'Scegli il Pacchetto: ', bold: true }, 'Individuiamo insieme o scegli il pacchetto più adatto alle tue esigenze e frequenza di allenamento.'], style: 'ruleItem' },
-                { text: [{ text: 'Avvio Programma: ', bold: true }, 'Ti invio la scheda di allenamento strutturata e tutte le istruzioni dettagliate in formato PDF.'], style: 'ruleItem' },
-                { text: [{ text: 'Inizio Coaching (se incluso): ', bold: true }, 'Partiamo con il tracking dei progressi, check-in settimanali e aggiornamenti al programma quando necessario.'], style: 'ruleItem' }
+                { text: [{ text: 'Compila consenso e anamnesi: ', bold: true }, 'firma il consenso informato e compila l\'anamnesi con i tuoi dati di base, obiettivi e storico clinico.'], style: 'ruleItem' },
+                { text: [{ text: 'Scegli pacchetti: ', bold: true }, 'individuiamo insieme il pacchetto più adatto alle tue esigenze e frequenza di allenamento.'], style: 'ruleItem' },
+                { text: [{ text: 'Pagamento: ', bold: true }, 'conferma il pacchetto scelto tramite la modalità di pagamento concordata.'], style: 'ruleItem' },
+                { text: [{ text: 'Avvio programma: ', bold: true }, 'ricevi la scheda di allenamento strutturata e tutte le istruzioni dettagliate.'], style: 'ruleItem' },
+                { text: [{ text: 'Inizio coaching: ', bold: true }, 'partiamo con il tracking dei progressi e gli aggiornamenti al programma quando necessario.'], style: 'ruleItem' }
             ],
             margin: [10, 0, 0, 30]
         });
     }
+
+    // Disclaimer finale
+    content.push({
+        text: 'Documento ad uso personale del cliente. Vietata la diffusione senza autorizzazione. Le indicazioni non sostituiscono parere medico.',
+        style: 'disclaimer',
+        alignment: 'center',
+        margin: [20, 40, 20, 0]
+    });
 
     const docDefinition = {
         content: content,
@@ -415,6 +397,7 @@ export const generateServicesPDF = async (
             bulletPoint: { fontSize: 11, color: '#475569', margin: [0, 2, 0, 2] as [number, number, number, number] },
             sectionHeading: { fontSize: 16, bold: true, color: trainerSettings?.primary_color || '#003366', decoration: 'underline' },
             ruleItem: { fontSize: 11, color: '#475569', margin: [0, 3, 0, 3] as [number, number, number, number] },
+            disclaimer: { fontSize: 9, italics: true, color: '#94a3b8' },
 
             // Stili per la tabella "Come scegliere"
             tableHeaderLeft: { bold: true, fontSize: 12, color: 'white', fillColor: trainerSettings?.primary_color || '#003366', alignment: 'center' as const, margin: [0, 8, 0, 8] as [number, number, number, number] },

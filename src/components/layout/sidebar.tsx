@@ -47,26 +47,26 @@ export function Sidebar({ isCollapsed, setIsCollapsed, settings }: SidebarProps)
             </button>
 
             {/* Logo / Brand */}
-            <div className={cn("flex items-center p-6 h-28 shrink-0", isCollapsed ? "justify-center" : "justify-start")}>
+            <div className={cn("flex items-center shrink-0", isCollapsed ? "justify-center p-4 h-24" : "justify-center px-4 py-4 h-36")}>
                 {isCollapsed ? (
                     sidebarLogoUrl ? (
-                        <img src={sidebarLogoUrl} alt={siteName} className="w-10 h-10 object-contain" />
+                        <img src={sidebarLogoUrl} alt={siteName} className="w-14 h-14 object-contain" />
                     ) : logoUrl ? (
-                        <img src={logoUrl} alt={siteName} className="w-10 h-10 object-contain" />
+                        <img src={logoUrl} alt={siteName} className="w-14 h-14 object-contain" />
                     ) : (
-                        <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/20">
-                            <span className="text-xl font-black text-white">
+                        <div className="w-14 h-14 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-md border border-white/20">
+                            <span className="text-2xl font-black text-white">
                                 {siteName.substring(0, 1) || "E"}
                             </span>
                         </div>
                     )
                 ) : (
                     sidebarLogoUrl ? (
-                        <img src={sidebarLogoUrl} alt={siteName} className="h-12 max-w-[180px] object-contain" />
+                        <img src={sidebarLogoUrl} alt={siteName} className="h-24 max-w-[220px] object-contain" />
                     ) : logoUrl ? (
-                        <img src={logoUrl} alt={siteName} className="h-12 max-w-[180px] object-contain" />
+                        <img src={logoUrl} alt={siteName} className="h-24 max-w-[220px] object-contain" />
                     ) : (
-                        <h2 className="text-xl font-black tracking-tight whitespace-pre-wrap leading-tight text-white drop-shadow-sm">
+                        <h2 className="text-xl font-black tracking-tight whitespace-pre-wrap leading-tight text-white drop-shadow-sm text-center">
                             {siteName}
                         </h2>
                     )

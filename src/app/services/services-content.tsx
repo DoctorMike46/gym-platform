@@ -49,14 +49,6 @@ export default function ServicesPageClient({ servicesData }: { servicesData: any
     const [editingService, setEditingService] = useState<any>(null);
     const [deletingId, setDeletingId] = useState<number | null>(null);
 
-    // Grouping
-    const groupedServices = servicesData.reduce((acc: any, service: any) => {
-        const cat = service.categoria || "Generale";
-        if (!acc[cat]) acc[cat] = [];
-        acc[cat].push(service);
-        return acc;
-    }, {});
-
     const categorieDisponibili = ["Coaching Online", "Schede Preimpostate", "Consulenza Singola", "Personal Training", "Altro"];
 
     async function handleSave(formData: FormData) {
@@ -226,8 +218,8 @@ export default function ServicesPageClient({ servicesData }: { servicesData: any
                     </AlertDialogContent>
                 </AlertDialog>
 
-                {/* Display Services grouped by category */}
-                {Object.keys(groupedServices).length === 0 ? (
+                {/* Display Services (ordinati per prezzo crescente) */}
+                {servicesData.length === 0 ? (
                     <div className="flex flex-col items-center justify-center p-16 bg-white border border-slate-200 border-dashed rounded-xl shadow-sm">
                         <Tag className="h-12 w-12 text-slate-300 mb-4" />
                         <h3 className="text-lg font-medium text-slate-900 mb-1">Nessun servizio nel listino</h3>
@@ -235,85 +227,73 @@ export default function ServicesPageClient({ servicesData }: { servicesData: any
                         <Button className="brand-bg text-white shadow-sm" onClick={openCreate}>Inizia Ora</Button>
                     </div>
                 ) : (
-                    <div className="space-y-10">
-                        {categorieDisponibili.map(cat => {
-                            const svcs = groupedServices[cat];
-                            if (!svcs) return null;
-
-                            return (
-                                <div key={cat} className="space-y-4">
-                                    <h2 className="text-xl font-bold text-slate-800 border-b border-slate-200 pb-2">{cat}</h2>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                                        {svcs.map((service: any) => (
-                                            <Card key={service.id} className="relative bg-white shadow-sm hover:shadow-md transition-shadow border-slate-200 group flex flex-col">
-                                                <CardHeader className="pb-4 border-b border-slate-50">
-                                                    <div className="flex justify-between items-start">
-                                                        <div>
-                                                            <CardTitle className="text-lg font-bold brand-text">{service.nome_servizio}</CardTitle>
-                                                            {service.descrizione_breve && (
-                                                                <p className="text-sm text-slate-500 mt-1 line-clamp-2">{service.descrizione_breve}</p>
-                                                            )}
-                                                        </div>
-                                                        <div className="bg-slate-50 text-slate-700 px-3 py-1 rounded-lg border border-slate-100 font-bold whitespace-nowrap">
-                                                            €{(service.prezzo / 100).toFixed(2)}
-                                                        </div>
-                                                    </div>
-                                                </CardHeader>
-
-                                                <CardContent className="pt-4 flex-1">
-                                                    <div className="space-y-3">
-                                                        {service.durata_settimane && (
-                                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium">
-                                                                Durata: {service.durata_settimane} Settimane
-                                                            </Badge>
-                                                        )}
-                                                        {service.include_coaching && (
-                                                            <Badge variant="outline" className="ml-2 bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">
-                                                                Coaching Incluso
-                                                            </Badge>
-                                                        )}
-
-                                                        {service.caratteristiche && (
-                                                            <ul className="mt-4 space-y-2">
-                                                                {service.caratteristiche.split('\n').map((feat: string, i: number) => {
-                                                                    if (!feat.trim()) return null;
-                                                                    return (
-                                                                        <li key={i} className="flex items-start text-sm text-slate-600">
-                                                                            <CheckCircle2 size={14} className="mr-2 mt-0.5 brand-text opacity-70 flex-shrink-0" />
-                                                                            <span className="leading-tight">{feat.trim()}</span>
-                                                                        </li>
-                                                                    )
-                                                                })}
-                                                            </ul>
-                                                        )}
-                                                    </div>
-                                                </CardContent>
-
-                                                {/* Actions */}
-                                                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-slate-100 flex items-center gap-1">
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600" onClick={() => openEdit(service)}>
-                                                                <Edit2 size={14} />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>Modifica pacchetto</TooltipContent>
-                                                    </Tooltip>
-                                                    <Tooltip>
-                                                        <TooltipTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-rose-600 hover:bg-rose-50" onClick={() => confirmDelete(service.id)}>
-                                                                <Trash2 size={14} />
-                                                            </Button>
-                                                        </TooltipTrigger>
-                                                        <TooltipContent>Disattiva pacchetto</TooltipContent>
-                                                    </Tooltip>
-                                                </div>
-                                            </Card>
-                                        ))}
+                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        {servicesData.map((service: any) => (
+                            <Card key={service.id} className="relative bg-white shadow-sm hover:shadow-md transition-shadow border-slate-200 group flex flex-col">
+                                <CardHeader className="pb-4 border-b border-slate-50">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <CardTitle className="text-lg font-bold brand-text">{service.nome_servizio}</CardTitle>
+                                            {service.descrizione_breve && (
+                                                <p className="text-sm text-slate-500 mt-1 line-clamp-2">{service.descrizione_breve}</p>
+                                            )}
+                                        </div>
+                                        <div className="bg-slate-50 text-slate-700 px-3 py-1 rounded-lg border border-slate-100 font-bold whitespace-nowrap">
+                                            €{(service.prezzo / 100).toFixed(2)}
+                                        </div>
                                     </div>
+                                </CardHeader>
+
+                                <CardContent className="pt-4 flex-1">
+                                    <div className="space-y-3">
+                                        {service.durata_settimane && (
+                                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium">
+                                                Durata: {service.durata_settimane} Settimane
+                                            </Badge>
+                                        )}
+                                        {service.include_coaching && (
+                                            <Badge variant="outline" className="ml-2 bg-emerald-50 text-emerald-700 border-emerald-200 font-medium">
+                                                Coaching Incluso
+                                            </Badge>
+                                        )}
+
+                                        {service.caratteristiche && (
+                                            <ul className="mt-4 space-y-2">
+                                                {service.caratteristiche.split('\n').map((feat: string, i: number) => {
+                                                    if (!feat.trim()) return null;
+                                                    return (
+                                                        <li key={i} className="flex items-start text-sm text-slate-600">
+                                                            <CheckCircle2 size={14} className="mr-2 mt-0.5 brand-text opacity-70 flex-shrink-0" />
+                                                            <span className="leading-tight">{feat.trim()}</span>
+                                                        </li>
+                                                    )
+                                                })}
+                                            </ul>
+                                        )}
+                                    </div>
+                                </CardContent>
+
+                                {/* Actions */}
+                                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-slate-100 flex items-center gap-1">
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600" onClick={() => openEdit(service)}>
+                                                <Edit2 size={14} />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Modifica pacchetto</TooltipContent>
+                                    </Tooltip>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-rose-600 hover:bg-rose-50" onClick={() => confirmDelete(service.id)}>
+                                                <Trash2 size={14} />
+                                            </Button>
+                                        </TooltipTrigger>
+                                        <TooltipContent>Disattiva pacchetto</TooltipContent>
+                                    </Tooltip>
                                 </div>
-                            );
-                        })}
+                            </Card>
+                        ))}
                     </div>
                 )}
             </div>

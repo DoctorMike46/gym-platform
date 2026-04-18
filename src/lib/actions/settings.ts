@@ -17,6 +17,22 @@ export async function getSettings() {
     }
 }
 
+// Branding pubblico (no auth) per pagine come /login.
+// Restituisce la prima riga di settings — assunzione: istanza single-trainer.
+export async function getPublicBranding() {
+    try {
+        const result = await db.select({
+            site_name: settings.site_name,
+            logo_url: settings.logo_url,
+            primary_color: settings.primary_color,
+            sidebar_color: settings.sidebar_color,
+        }).from(settings).limit(1);
+        return result[0] || null;
+    } catch {
+        return null;
+    }
+}
+
 export async function updateSettings(formData: FormData) {
     const trainer = await getAuthenticatedTrainer();
     try {

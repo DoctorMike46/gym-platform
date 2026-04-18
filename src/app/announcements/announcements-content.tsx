@@ -360,15 +360,15 @@ export default function AnnouncementsContent({
 
             {/* View Dialog */}
             <Dialog open={!!viewing} onOpenChange={(open) => { if (!open) setViewing(null); }}>
-                <DialogContent className="sm:max-w-[500px]">
+                <DialogContent className="sm:max-w-[600px] md:max-w-[720px] max-h-[85vh] overflow-y-auto overflow-x-hidden">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-xl text-slate-900">
-                            {viewing?.tipo === 'offerta' ? <Tag size={20} className="text-emerald-600" /> : <Megaphone size={20} className="brand-text" />}
-                            {viewing?.titolo}
+                        <DialogTitle className="flex items-center gap-2 text-xl text-slate-900 break-words">
+                            {viewing?.tipo === 'offerta' ? <Tag size={20} className="text-emerald-600 flex-shrink-0" /> : <Megaphone size={20} className="brand-text flex-shrink-0" />}
+                            <span className="break-words min-w-0">{viewing?.titolo}</span>
                         </DialogTitle>
                     </DialogHeader>
                     <div className="space-y-5 py-4">
-                        <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
+                        <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed break-words max-w-full">
                             {viewing?.contenuto}
                         </div>
                         <div className="flex flex-col gap-2 text-xs text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-200">
@@ -426,14 +426,14 @@ export default function AnnouncementsContent({
 
             {/* List */}
             <TooltipProvider>
-                <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden mt-6">
-                    <Table>
+                <div className="rounded-xl border border-slate-200 bg-white shadow-sm mt-6 w-full max-w-full overflow-x-auto">
+                    <Table className="w-full table-fixed">
                         <TableHeader className="bg-slate-50">
                             <TableRow className="hover:bg-slate-50 border-slate-200">
                                 <TableHead className="text-slate-700 font-semibold w-[40%]">Titolo</TableHead>
-                                <TableHead className="text-slate-700 font-semibold">Tipo</TableHead>
-                                <TableHead className="text-slate-700 font-semibold">Stato</TableHead>
-                                <TableHead className="text-slate-700 font-semibold">Data</TableHead>
+                                <TableHead className="text-slate-700 font-semibold w-[120px]">Tipo</TableHead>
+                                <TableHead className="text-slate-700 font-semibold w-[140px]">Stato</TableHead>
+                                <TableHead className="text-slate-700 font-semibold w-[120px]">Data</TableHead>
                                 <TableHead className="text-center text-slate-700 font-semibold w-[160px]">Azioni</TableHead>
                             </TableRow>
                         </TableHeader>
@@ -449,15 +449,15 @@ export default function AnnouncementsContent({
                             )}
                             {filteredAnnouncements.map(ann => (
                                 <TableRow key={ann.id} className="border-slate-200 hover:bg-slate-50/70 text-slate-800 group">
-                                    <TableCell>
-                                        <div className="flex flex-col">
-                                            <span className="font-semibold text-slate-900">{ann.titolo}</span>
-                                            <span className="text-xs text-slate-400 line-clamp-1 mt-0.5" title={ann.contenuto}>
+                                    <TableCell className="max-w-0">
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="font-semibold text-slate-900 truncate" title={ann.titolo}>{ann.titolo}</span>
+                                            <span className="text-xs text-slate-400 line-clamp-1 mt-0.5 break-all" title={ann.contenuto}>
                                                 {ann.contenuto}
                                             </span>
-                                            <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400">
-                                                <Users size={10} />
-                                                <span>{ann.destinatari === "tutti" ? "Tutti i clienti" : `${ann.recipients.length} clienti selezionati`}</span>
+                                            <div className="flex items-center gap-1 mt-1 text-[10px] text-slate-400 truncate">
+                                                <Users size={10} className="flex-shrink-0" />
+                                                <span className="truncate">{ann.destinatari === "tutti" ? "Tutti i clienti" : `${ann.recipients.length} clienti selezionati`}</span>
                                             </div>
                                         </div>
                                     </TableCell>
