@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import { uploadToR2 } from "@/lib/r2";
 
 export async function POST(request: NextRequest) {
     try {
@@ -26,17 +26,17 @@ export async function POST(request: NextRequest) {
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        // Create unique filename
-        const ext = path.extname(file.name) || ".png";
-        const uniqueName = `logo_${Date.now()}${ext}`;
-        const uploadDir = path.join(process.cwd(), "public", "uploads");
-        const filePath = path.join(uploadDir, uniqueName);
+        const ext = path.extname(file.name).toLowerCase() || ".png";
+        const sanitizedExt = ext.replace(/[^a-zA-Z0-9.]/g, "");
+        const key = `public/logos/logo_${Date.now()}${sanitizedExt}`;
 
-        // Ensure uploads directory exists
-        await mkdir(uploadDir, { recursive: true });
-        await writeFile(filePath, buffer);
+        await uploadToR2({
+            key,
+            body: buffer,
+            contentType: file.type,
+        });
 
-        const publicUrl = `/uploads/${uniqueName}`;
+        const publicUrl = `/api/media/${key}`;
         return NextResponse.json({ url: publicUrl, success: true });
     } catch (error) {
         console.error("Errore upload:", error);
