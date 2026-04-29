@@ -2,10 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { CLIENT_COOKIE } from "@/lib/client-auth";
 
 export async function POST(request: NextRequest) {
+    // CSRF: confronta l'origin del browser con l'host della request stessa.
+    // Auto-deriva, funziona su qualsiasi dominio (preview Vercel, custom, www) senza
+    // dipendere da NEXT_PUBLIC_APP_URL (che spesso non matcha tutti gli alias).
     const origin = request.headers.get("origin");
-    const expectedOrigin = process.env.NEXT_PUBLIC_APP_URL;
-    if (expectedOrigin && origin && origin !== expectedOrigin) {
-        return NextResponse.json({ error: "Origine non consentita" }, { status: 403 });
+    if (origin) {
+        try {
+            const requestHost = new URL(request.url).host;
+            const originHost = new URL(origin).host;
+            if (originHost !== requestHost) {
+                return NextResponse.json({ error: "Origine non consentita" }, { status: 403 });
+            }
+        } catch {
+            return NextResponse.json({ error: "Origine non valida" }, { status: 403 });
+        }
     }
 
     const response = NextResponse.json({ success: true });

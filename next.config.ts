@@ -6,7 +6,10 @@ const withSerwist = withSerwistInit({
   swDest: "public/sw.js",
   cacheOnNavigation: false,
   reloadOnOnline: true,
-  disable: process.env.NODE_ENV === "development",
+  // PWA disabilitata: bug build non-deterministico con @serwist/next 9.5.7 + Next 15.5
+  // ("Cannot read properties of undefined (reading 'call')" in webpack-runtime random).
+  // Da reabilitare dopo upgrade Serwist o dopo aver isolato il root cause.
+  disable: true,
 });
 
 const nextConfig: NextConfig = {
