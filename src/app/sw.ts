@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist, CacheFirst, ExpirationPlugin, StaleWhileRevalidate } from "serwist";
+import { Serwist, CacheFirst, ExpirationPlugin } from "serwist";
 
 declare global {
     interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -38,10 +38,9 @@ const serwist = new Serwist({
                 ],
             }),
         },
-        {
-            matcher: ({ request }) => request.destination === "document",
-            handler: new StaleWhileRevalidate({ cacheName: "html-pages" }),
-        },
+        // defaultCache è un catch-all NetworkOnly: niente HTML/dati autenticati restano in
+        // cache, evitando che pagine /portal o /clients siano servite dopo logout.
+        // Quando offline interviene il fallback "/offline" (precachato).
         ...defaultCache,
     ],
     fallbacks: {

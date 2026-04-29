@@ -10,8 +10,11 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({ success: true });
     response.cookies.set("trainer_session", "", {
         httpOnly: true,
-        maxAge: 0,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
         path: "/",
+        expires: new Date(0),
+        maxAge: 0,
     });
     return response;
 }

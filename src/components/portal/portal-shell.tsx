@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { Home, Dumbbell, TrendingUp, FileText, User, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,12 +28,26 @@ const NAV_ITEMS = [
 
 export function PortalShell({ brand, clientName, children }: PortalShellProps) {
     const pathname = usePathname();
-    const router = useRouter();
 
     async function logout() {
-        await fetch("/api/portal/auth/logout", { method: "POST" });
-        router.push("/portal/login");
-        router.refresh();
+        try {
+            await fetch("/api/portal/auth/logout", {
+                method: "POST",
+                credentials: "same-origin",
+            });
+        } catch {
+            // anche se la chiamata fallisce, procediamo con il redirect (il middleware blocchera' l'accesso)
+        }
+        // Pulisci eventuali cache PWA legacy (versioni precedenti del SW cachevano html-pages)
+        if (typeof window !== "undefined" && "caches" in window) {
+            try {
+                await caches.delete("html-pages");
+            } catch {
+                // ignore
+            }
+        }
+        // Hard navigation: distrugge lo stato React (incluso questo shell) e forza il middleware
+        window.location.replace("/portal/login");
     }
 
     function isActive(href: string, exact: boolean) {

@@ -9,6 +9,15 @@ export async function POST(request: NextRequest) {
     }
 
     const response = NextResponse.json({ success: true });
-    response.cookies.set(CLIENT_COOKIE, "", { httpOnly: true, maxAge: 0, path: "/" });
+    // Sovrascrivi con stessi attributi del set originale, expires nel passato.
+    // Senza far combaciare path/sameSite/secure alcuni browser non rimuovono il cookie.
+    response.cookies.set(CLIENT_COOKIE, "", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        expires: new Date(0),
+        maxAge: 0,
+    });
     return response;
 }

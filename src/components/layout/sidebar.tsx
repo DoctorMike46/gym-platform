@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
     Users,
     LayoutDashboard,
@@ -71,13 +71,27 @@ export function SidebarContent({
     const logoUrl = settings?.logo_url || "";
     const sidebarLogoUrl = settings?.sidebar_logo_url || "";
     const pathname = usePathname();
-    const router = useRouter();
 
     async function handleLogout() {
-        await fetch("/api/auth/logout", { method: "POST" });
+        try {
+            await fetch("/api/auth/logout", {
+                method: "POST",
+                credentials: "same-origin",
+            });
+        } catch {
+            // anche se la chiamata fallisce, procediamo con il redirect (il middleware blocchera' l'accesso)
+        }
         onNavigate?.();
-        router.push("/login");
-        router.refresh();
+        // Pulisci eventuali cache PWA legacy (versioni precedenti del SW cachevano html-pages)
+        if (typeof window !== "undefined" && "caches" in window) {
+            try {
+                await caches.delete("html-pages");
+            } catch {
+                // ignore
+            }
+        }
+        // Hard navigation: distrugge lo stato React e forza il middleware a verificare il cookie
+        window.location.replace("/login");
     }
 
     return (
