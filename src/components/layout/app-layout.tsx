@@ -1,35 +1,53 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { usePathname } from "next/navigation"
-import { Sidebar } from "./sidebar"
-import { Toaster } from "@/components/ui/sonner"
-import { cn } from "@/lib/utils"
+import { useState } from "react";
+import { usePathname } from "next/navigation";
+import { Sidebar } from "./sidebar";
+import { TopBar } from "./top-bar";
+import { Toaster } from "@/components/ui/sonner";
+import { RegisterSW } from "@/components/pwa/register-sw";
+import { InstallPrompt } from "@/components/pwa/install-prompt";
 
-export function AppLayout({ children, settings }: { children: React.ReactNode, settings: any }) {
-    const [isCollapsed, setIsCollapsed] = useState(false)
-    const pathname = usePathname()
-    const isLoginPage = pathname === "/login"
+interface AppLayoutSettings {
+    site_name?: string | null;
+    logo_url?: string | null;
+    sidebar_logo_url?: string | null;
+    sidebar_color?: string | null;
+    primary_color?: string | null;
+}
 
-    if (isLoginPage) {
+const STANDALONE_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/portal"];
+
+export function AppLayout({
+    children,
+    settings,
+}: {
+    children: React.ReactNode;
+    settings: AppLayoutSettings | null;
+}) {
+    const [isCollapsed, setIsCollapsed] = useState(false);
+    const pathname = usePathname();
+    const isStandalone = STANDALONE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+    if (isStandalone) {
         return (
             <>
                 {children}
                 <Toaster theme="light" />
+                <RegisterSW />
+                <InstallPrompt />
             </>
-        )
+        );
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 flex">
+        <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
             <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} settings={settings} />
-            <main className={cn(
-                "flex-1 p-8 transition-all duration-500",
-                isCollapsed ? "ml-[112px]" : "ml-[288px]"
-            )}>
-                {children}
-            </main>
+            <TopBar settings={settings} />
+            <main className="flex-1 p-4 md:p-8 min-w-0">{children}</main>
             <Toaster theme="light" />
+            <RegisterSW />
+            <InstallPrompt />
         </div>
-    )
+    );
 }

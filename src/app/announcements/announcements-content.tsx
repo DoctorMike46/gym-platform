@@ -179,10 +179,10 @@ export default function AnnouncementsContent({
     return (
         <div className="space-y-6">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 flex items-center gap-3">
-                        <Megaphone className="brand-text" size={32} />
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 flex items-center gap-3">
+                        <Megaphone className="brand-text shrink-0" size={28} />
                         Annunci & Offerte
                     </h1>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -191,7 +191,7 @@ export default function AnnouncementsContent({
                 </div>
                 <button
                     onClick={() => { resetForm(); setShowForm(true); }}
-                    className="flex items-center gap-2 px-4 py-2.5 brand-bg text-white rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl"
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 brand-bg text-white rounded-xl hover:opacity-90 transition-all shadow-lg hover:shadow-xl w-full sm:w-auto"
                 >
                     <Plus size={18} />
                     <span className="font-medium">Nuovo Annuncio</span>
@@ -236,7 +236,7 @@ export default function AnnouncementsContent({
                             />
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
                                 <select
@@ -402,7 +402,7 @@ export default function AnnouncementsContent({
                 </div>
                 <div className="flex items-center gap-2">
                     <Select value={filterTipo} onValueChange={setFilterTipo}>
-                        <SelectTrigger className="w-[180px] h-10 bg-white border-slate-200 shadow-sm">
+                        <SelectTrigger className="w-full sm:w-[180px] h-10 bg-white border-slate-200 shadow-sm">
                             <SelectValue placeholder="Tutti i tipi" />
                         </SelectTrigger>
                         <SelectContent>
@@ -427,14 +427,14 @@ export default function AnnouncementsContent({
             {/* List */}
             <TooltipProvider>
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm mt-6 w-full max-w-full overflow-x-auto">
-                    <Table className="w-full table-fixed">
+                    <Table className="w-full min-w-[700px]">
                         <TableHeader className="bg-slate-50">
                             <TableRow className="hover:bg-slate-50 border-slate-200">
-                                <TableHead className="text-slate-700 font-semibold w-[40%]">Titolo</TableHead>
-                                <TableHead className="text-slate-700 font-semibold w-[120px]">Tipo</TableHead>
-                                <TableHead className="text-slate-700 font-semibold w-[140px]">Stato</TableHead>
-                                <TableHead className="text-slate-700 font-semibold w-[120px]">Data</TableHead>
-                                <TableHead className="text-center text-slate-700 font-semibold w-[160px]">Azioni</TableHead>
+                                <TableHead className="text-slate-700 font-semibold min-w-[240px]">Titolo</TableHead>
+                                <TableHead className="text-slate-700 font-semibold min-w-[110px]">Tipo</TableHead>
+                                <TableHead className="text-slate-700 font-semibold min-w-[130px]">Stato</TableHead>
+                                <TableHead className="text-slate-700 font-semibold min-w-[110px]">Data</TableHead>
+                                <TableHead className="text-center text-slate-700 font-semibold min-w-[140px]">Azioni</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>

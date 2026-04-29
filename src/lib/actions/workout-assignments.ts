@@ -1,7 +1,7 @@
 "use server"
 
 import { db } from "@/db";
-import { client_workout_assignments, clients, workout_templates, settings, trainers, subscriptions, documents, workout_template_exercises } from "@/db/schema";
+import { client_workout_assignments, clients, workout_templates, settings, trainers, documents, workout_template_exercises } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getAuthenticatedTrainer } from "@/lib/auth";
@@ -44,25 +44,13 @@ export async function assignWorkoutToClient(data: {
         });
         if (!template) return { success: false, error: "Template non trovato" };
 
-        // 2. Verifica abbonamento attivo
-        const activeSubscription = await db.query.subscriptions.findFirst({
-            where: and(
-                eq(subscriptions.client_id, data.client_id),
-                eq(subscriptions.status, "attivo")
-            ),
-        });
-
-        if (!activeSubscription) {
-            return { success: false, error: "Il cliente non ha un abbonamento attivo" };
-        }
-
-        // 3. Recupera info trainer
+        // 2. Recupera info trainer
         const [trainerAccount, trainerSettings] = await Promise.all([
             db.query.trainers.findFirst({ where: eq(trainers.id, trainer.id) }),
             db.query.settings.findFirst({ where: eq(settings.trainer_id, trainer.id) })
         ]);
 
-        // 4. Genera PDF Scheda
+        // 3. Genera PDF Scheda
         const today = new Date().toLocaleDateString('it-IT');
         const pdfBuffer = await generateWorkoutPDFBuffer(
             template,
@@ -70,7 +58,7 @@ export async function assignWorkoutToClient(data: {
             { nome: client.nome, cognome: client.cognome, dataAssegnazione: today }
         );
 
-        // 5. Upload su R2 & Salva Documento
+        // 4. Upload su R2 & Salva Documento
         const fileName = `Scheda_${template.nome_template.replace(/\s+/g, '_')}_${client.nome}.pdf`;
         const r2Key = generateR2Key(trainer.id, client.id, fileName);
 
@@ -91,7 +79,7 @@ export async function assignWorkoutToClient(data: {
             note: `Generata automaticamente assegnata il ${today}`
         });
 
-        // 6. Inserisci assegnazione nel DB
+        // 5. Inserisci assegnazione nel DB
         await db.insert(client_workout_assignments).values({
             client_id: data.client_id,
             template_id: data.template_id,
@@ -101,7 +89,7 @@ export async function assignWorkoutToClient(data: {
 
         const platformName = trainerSettings?.site_name || "Gym Platform";
 
-        // 7. Invia email notificando il cliente con allegato
+        // 6. Invia email notificando il cliente con allegato
         await sendWorkoutAssignmentEmail({
             clientEmail: client.email,
             clientName: client.nome,

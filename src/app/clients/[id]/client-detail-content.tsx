@@ -36,6 +36,7 @@ import { getWorkoutTemplateWithExercises } from "@/lib/actions/workouts";
 import { getSettings } from "@/lib/actions/settings";
 import { generateWorkoutPDF } from "@/lib/pdf-generator";
 import { uploadDocument } from "@/lib/actions/documents";
+import { PortalAccessCard } from "@/components/clients/portal-access-card";
 import { toast } from "sonner";
 
 export default function ClientDetailContent({
@@ -245,22 +246,24 @@ export default function ClientDetailContent({
         <TooltipProvider delayDuration={300}>
             <div className="space-y-6 max-w-5xl">
                 {/* Header */}
-                <div className="flex items-center gap-4">
-                    <Button
-                        variant="ghost"
-                        size="icon"
-                        className="text-slate-500 hover:text-slate-900"
-                        onClick={() => router.push("/clients")}
-                    >
-                        <ArrowLeft size={20} />
-                    </Button>
-                    <div className="flex-1">
-                        <h1 className="text-3xl font-bold text-slate-900">
-                            {client.nome} {client.cognome}
-                        </h1>
-                        <p className="text-slate-500 mt-0.5">{client.email}</p>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-slate-500 hover:text-slate-900 shrink-0"
+                            onClick={() => router.push("/clients")}
+                        >
+                            <ArrowLeft size={20} />
+                        </Button>
+                        <div className="flex-1 min-w-0">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 truncate">
+                                {client.nome} {client.cognome}
+                            </h1>
+                            <p className="text-slate-500 mt-0.5 text-sm truncate">{client.email}</p>
+                        </div>
                     </div>
-                    <Button className="brand-bg text-white gap-2" onClick={() => setIsEditOpen(true)}>
+                    <Button className="brand-bg text-white gap-2 w-full sm:w-auto sm:ml-auto" onClick={() => setIsEditOpen(true)}>
                         <Edit2 size={16} /> Modifica Profilo
                     </Button>
                 </div>
@@ -290,23 +293,23 @@ export default function ClientDetailContent({
                         {/* Schede di Allenamento */}
                         <Card className="bg-white border-slate-200 shadow-sm">
                             <CardHeader className="pb-3 border-b border-slate-100">
-                                <div className="flex justify-between items-center">
+                                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
                                     <CardTitle className="text-base flex items-center gap-2">
                                         <Dumbbell size={16} className="brand-text" /> Schede di Allenamento
                                     </CardTitle>
                                     <div className="flex items-center gap-2">
-                                        <Link href={`/workouts/builder?client=${client.id}`}>
+                                        <Link href={`/workouts/builder?client=${client.id}`} className="flex-1 sm:flex-initial">
                                             <Button
                                                 size="sm"
                                                 variant="outline"
-                                                className="h-7 text-xs gap-1.5 brand-text brand-border brand-hover-bg"
+                                                className="h-7 text-xs gap-1.5 brand-text brand-border brand-hover-bg w-full sm:w-auto"
                                             >
                                                 <Edit2 size={12} /> Personalizzata
                                             </Button>
                                         </Link>
                                         <Button
                                             size="sm"
-                                            className="h-7 text-xs gap-1.5 brand-bg text-white"
+                                            className="h-7 text-xs gap-1.5 brand-bg text-white flex-1 sm:flex-initial"
                                             onClick={() => setIsAssignWorkoutOpen(true)}
                                         >
                                             <Plus size={12} /> Assegna
@@ -324,13 +327,13 @@ export default function ClientDetailContent({
                                 ) : (
                                     <div className="grid gap-3">
                                         {client.workout_assignments?.map((assignment: any) => (
-                                            <div key={assignment.id} className="flex items-center justify-between p-3 rounded-lg bg-white border border-slate-200 shadow-sm transition-all hover:border-slate-300">
-                                                <div className="flex items-center gap-3">
-                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${assignment.attivo ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
+                                            <div key={assignment.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-lg bg-white border border-slate-200 shadow-sm transition-all hover:border-slate-300">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className={`w-10 h-10 shrink-0 rounded-full flex items-center justify-center ${assignment.attivo ? 'bg-blue-50 text-blue-600' : 'bg-slate-100 text-slate-400'}`}>
                                                         <Activity size={18} />
                                                     </div>
-                                                    <div>
-                                                        <p className={`font-medium text-sm ${assignment.attivo ? 'text-slate-900' : 'text-slate-500'}`}>
+                                                    <div className="min-w-0">
+                                                        <p className={`font-medium text-sm truncate ${assignment.attivo ? 'text-slate-900' : 'text-slate-500'}`}>
                                                             {assignment.template?.nome_template}
                                                         </p>
                                                         <p className="text-xs text-slate-400 mt-0.5">
@@ -338,7 +341,7 @@ export default function ClientDetailContent({
                                                         </p>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 self-end sm:self-auto">
                                                     <Badge className={
                                                         assignment.attivo
                                                             ? "bg-blue-100 text-blue-700 border-blue-200 shadow-none hover:bg-blue-100"
@@ -443,15 +446,15 @@ export default function ClientDetailContent({
                                 ) : (
                                     <div className="space-y-2">
                                         {client.subscriptions?.map((sub: any) => (
-                                            <div key={sub.id} className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-100">
-                                                <div>
-                                                    <p className="font-medium text-slate-800 text-sm">{sub.service?.nome_servizio}</p>
+                                            <div key={sub.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
+                                                <div className="min-w-0">
+                                                    <p className="font-medium text-slate-800 text-sm truncate">{sub.service?.nome_servizio}</p>
                                                     <p className="text-xs text-slate-400 mt-0.5">
                                                         Dal {sub.data_inizio}
                                                         {sub.data_fine && ` al ${sub.data_fine}`}
                                                     </p>
                                                 </div>
-                                                <div className="flex items-center gap-2">
+                                                <div className="flex items-center gap-2 self-end sm:self-auto">
                                                     <Badge className={
                                                         sub.status === "attivo"
                                                             ? "bg-emerald-100 text-emerald-700 border-emerald-200 shadow-none hover:bg-emerald-100"
@@ -598,6 +601,8 @@ export default function ClientDetailContent({
                                 </p>
                             </CardContent>
                         </Card>
+
+                        <PortalAccessCard clientId={client.id} />
                     </div>
                 </div>
 
@@ -653,7 +658,7 @@ export default function ClientDetailContent({
                                 <DialogDescription>Aggiorna i dati anagrafici del cliente.</DialogDescription>
                             </DialogHeader>
                             <div className="grid gap-4 py-4">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="edit-nome">Nome</Label>
                                         <Input id="edit-nome" name="nome" defaultValue={client.nome} required />
@@ -667,7 +672,7 @@ export default function ClientDetailContent({
                                     <Label htmlFor="edit-email">Email</Label>
                                     <Input id="edit-email" name="email" type="email" defaultValue={client.email} required />
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="edit-nascita">Data di nascita</Label>
                                         <Input id="edit-nascita" name="data_di_nascita" type="date" defaultValue={client.data_di_nascita || ""} />
@@ -677,7 +682,7 @@ export default function ClientDetailContent({
                                         <Input id="edit-eta" name="eta" type="number" placeholder="30" defaultValue={client.eta || ""} />
                                     </div>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="edit-peso">Peso (kg)</Label>
                                         <Input id="edit-peso" name="peso" placeholder="75" defaultValue={client.peso || ""} />

@@ -122,15 +122,15 @@ export default function ClientPageContent({
     return (
         <TooltipProvider delayDuration={300}>
             <div className="space-y-6">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-900">Gestione Clienti</h1>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Gestione Clienti</h1>
                         <p className="text-slate-500 mt-1">Anagrafica completa e stato degli abbonamenti attivi.</p>
                     </div>
 
                     <Dialog open={isAddClientOpen} onOpenChange={setIsAddClientOpen}>
                         <DialogTrigger asChild>
-                            <Button className="brand-bg text-white gap-2">
+                            <Button className="brand-bg text-white gap-2 w-full sm:w-auto">
                                 <UserPlus size={16} /> Nuovo Cliente
                             </Button>
                         </DialogTrigger>
@@ -141,7 +141,7 @@ export default function ClientPageContent({
                                     <DialogDescription>Inserisci i dati base per creare il profilo del cliente.</DialogDescription>
                                 </DialogHeader>
                                 <div className="grid gap-4 py-4">
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-2">
                                             <Label htmlFor="nome">Nome</Label>
                                             <Input id="nome" name="nome" placeholder="Mario" required />
@@ -224,7 +224,7 @@ export default function ClientPageContent({
                     </div>
                 </div>
 
-                <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
                     <Table>
                         <TableHeader className="bg-slate-50">
                             <TableRow className="hover:bg-slate-50 border-slate-200">

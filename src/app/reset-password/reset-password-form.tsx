@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Eye, EyeOff, Save, CheckCircle2 } from "lucide-react";
 import { resetPassword } from "@/lib/actions/auth-reset";
+import { validatePassword } from "@/lib/password-policy";
+import PasswordStrength from "@/components/ui/password-strength";
 import { toast } from "sonner";
 
 export default function ResetPasswordForm({
@@ -28,8 +30,9 @@ export default function ResetPasswordForm({
         setIsLoading(true);
         setError("");
 
-        if (password.length < 8) {
-            setError("La password deve essere di almeno 8 caratteri.");
+        const policy = validatePassword(password);
+        if (!policy.ok) {
+            setError(`Password non valida: ${policy.errors.join(", ")}.`);
             setIsLoading(false);
             return;
         }
@@ -101,6 +104,7 @@ export default function ResetPasswordForm({
                         {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
                 </div>
+                <PasswordStrength password={password} />
             </div>
 
             <div className="space-y-2">

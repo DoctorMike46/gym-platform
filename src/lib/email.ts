@@ -183,6 +183,150 @@ export async function sendAnnouncementEmail(params: {
 }
 
 /**
+ * Notifica al trainer: cliente ha completato un allenamento
+ */
+export async function sendClientLoggedWorkoutEmail(params: {
+    trainerEmail: string;
+    clientName: string;
+    workoutName: string;
+    date: string;
+    durationMinutes: number;
+    platformName: string;
+}) {
+    try {
+        if (!process.env.RESEND_API_KEY) return { success: false, error: "API key mancante" };
+        const { data, error } = await getResend()!.emails.send({
+            from: FROM_EMAIL,
+            to: params.trainerEmail,
+            subject: `${params.clientName} ha completato un allenamento`,
+            html: `
+                <!DOCTYPE html>
+                <html><head><style>${emailStyles}</style></head>
+                <body>
+                    <div class="container">
+                        <div class="header"><h1>${params.platformName}</h1></div>
+                        <div class="content">
+                            <h2 class="title">Allenamento completato</h2>
+                            <p><strong>${params.clientName}</strong> ha completato un allenamento.</p>
+                            <p><strong>Scheda:</strong> ${params.workoutName}<br>
+                            <strong>Data:</strong> ${params.date}<br>
+                            <strong>Durata:</strong> ${params.durationMinutes} minuti</p>
+                        </div>
+                        <div class="footer"><p style="margin: 0;">&copy; ${new Date().getFullYear()} ${params.platformName}.</p></div>
+                    </div>
+                </body></html>
+            `,
+        });
+        if (error) return { success: false, error: error.message };
+        return { success: true, id: data?.id };
+    } catch (e) {
+        console.error("Errore email notifica trainer:", e);
+        return { success: false, error: "Errore generico" };
+    }
+}
+
+/**
+ * Invia email di invito al portale cliente
+ */
+export async function sendClientInviteEmail(params: {
+    clientEmail: string;
+    clientName: string;
+    trainerName: string;
+    inviteLink: string;
+    platformName: string;
+}) {
+    try {
+        if (!process.env.RESEND_API_KEY) {
+            console.warn("RESEND_API_KEY non configurata, email non inviata");
+            return { success: false, error: "API key mancante" };
+        }
+
+        const { data, error } = await getResend()!.emails.send({
+            from: FROM_EMAIL,
+            to: params.clientEmail,
+            subject: `Sei stato invitato su ${params.platformName}`,
+            html: `
+                <!DOCTYPE html>
+                <html>
+                <head><style>${emailStyles}</style></head>
+                <body>
+                    <div class="container">
+                        <div class="header"><h1>${params.platformName}</h1></div>
+                        <div class="content">
+                            <h2 class="title">Benvenuto, ${params.clientName}!</h2>
+                            <p>${params.trainerName} ti ha invitato sul portale clienti di ${params.platformName}.</p>
+                            <p>Da qui potrai consultare le tue schede, tracciare i tuoi progressi, vedere documenti e gestire il tuo abbonamento.</p>
+                            <div style="text-align: center; margin: 32px 0;">
+                                <a href="${params.inviteLink}" class="button">Attiva il tuo Account</a>
+                            </div>
+                            <p>Il link scadrà tra 7 giorni. Se hai problemi, contatta il tuo trainer.</p>
+                            <p style="font-size: 13px; color: #64748b; margin-top: 24px;">
+                                Se il pulsante non funziona, copia questo link nel browser:<br>
+                                <span style="word-break: break-all;">${params.inviteLink}</span>
+                            </p>
+                        </div>
+                        <div class="footer">
+                            <p style="margin: 0;">&copy; ${new Date().getFullYear()} ${params.platformName}.</p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+            `,
+        });
+        if (error) return { success: false, error: error.message };
+        return { success: true, id: data?.id };
+    } catch (e) {
+        console.error("Errore invio invito cliente:", e);
+        return { success: false, error: "Errore generico" };
+    }
+}
+
+/**
+ * Invia email di recupero password al cliente
+ */
+export async function sendClientPasswordResetEmail(params: {
+    email: string;
+    clientName: string;
+    resetLink: string;
+    platformName: string;
+}) {
+    try {
+        if (!process.env.RESEND_API_KEY) {
+            return { success: false, error: "API key mancante" };
+        }
+        const { data, error } = await getResend()!.emails.send({
+            from: FROM_EMAIL,
+            to: params.email,
+            subject: `Recupero Password - ${params.platformName}`,
+            html: `
+                <!DOCTYPE html>
+                <html><head><style>${emailStyles}</style></head>
+                <body>
+                    <div class="container">
+                        <div class="header"><h1>${params.platformName}</h1></div>
+                        <div class="content">
+                            <h2 class="title">Recupero Password</h2>
+                            <p>Ciao <strong>${params.clientName}</strong>,</p>
+                            <p>Hai richiesto il ripristino password del tuo account su ${params.platformName}.</p>
+                            <div style="text-align: center; margin: 32px 0;">
+                                <a href="${params.resetLink}" class="button">Reimposta Password</a>
+                            </div>
+                            <p>Se non hai richiesto tu il ripristino, ignora questa email. Il link scadrà tra 1 ora.</p>
+                        </div>
+                        <div class="footer"><p style="margin: 0;">&copy; ${new Date().getFullYear()} ${params.platformName}.</p></div>
+                    </div>
+                </body></html>
+            `,
+        });
+        if (error) return { success: false, error: error.message };
+        return { success: true, id: data?.id };
+    } catch (e) {
+        console.error("Errore email reset cliente:", e);
+        return { success: false, error: "Errore generico" };
+    }
+}
+
+/**
  * Invia email per il recupero password
  */
 export async function sendPasswordResetEmail(params: {

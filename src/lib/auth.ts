@@ -1,10 +1,23 @@
 import { cookies } from "next/headers";
 import { jwtVerify, SignJWT } from "jose";
 import { redirect } from "next/navigation";
+import { db } from "@/db";
+import { trainers } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
-const JWT_SECRET = new TextEncoder().encode(
-    process.env.JWT_SECRET || "dev-secret-change-in-production-32ch"
-);
+function getJwtSecret(): Uint8Array {
+    const s = process.env.JWT_SECRET;
+    if (!s || s.length < 32) {
+        if (process.env.NODE_ENV === "production") {
+            throw new Error("JWT_SECRET must be set and >=32 chars in production");
+        }
+        console.warn("Using fallback dev JWT secret — DO NOT deploy this way");
+        return new TextEncoder().encode("dev-secret-change-in-production-32ch");
+    }
+    return new TextEncoder().encode(s);
+}
+
+const JWT_SECRET = getJwtSecret();
 
 export interface TrainerSession {
     id: number;
@@ -41,9 +54,21 @@ export async function getAuthenticatedTrainer(): Promise<TrainerSession> {
         const id = Number(payload.sub);
         const email = payload.email as string;
         const role = payload.role as string || "trainer";
+        const iat = payload.iat as number | undefined;
 
         if (!id || !email) {
             throw new Error("Token non valido");
+        }
+
+        if (iat) {
+            const [trainer] = await db
+                .select({ password_changed_at: trainers.password_changed_at })
+                .from(trainers)
+                .where(eq(trainers.id, id))
+                .limit(1);
+            if (trainer?.password_changed_at && iat * 1000 < trainer.password_changed_at.getTime()) {
+                throw new Error("Sessione invalidata");
+            }
         }
 
         return { id, email, role };

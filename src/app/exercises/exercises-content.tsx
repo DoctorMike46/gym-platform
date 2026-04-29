@@ -128,13 +128,13 @@ export default function ExercisesPageClient({ exercisesData }: { exercisesData: 
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900">Catalogo Esercizi</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Catalogo Esercizi</h1>
                     <p className="text-slate-500 mt-1">Gestisci la libreria di esercizi per i tuoi workout.</p>
                 </div>
 
-                <Button className="brand-bg text-white gap-2" onClick={openCreate}>
+                <Button className="brand-bg text-white gap-2 w-full sm:w-auto" onClick={openCreate}>
                     <Plus size={16} /> Nuovo Esercizio
                 </Button>
             </div>
@@ -174,7 +174,7 @@ export default function ExercisesPageClient({ exercisesData }: { exercisesData: 
             </div>
 
             {/* Grid Exercises */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
                 {filteredExercises.length === 0 && (
                     <div className="col-span-full text-center py-16 text-slate-500 border border-dashed border-slate-300 rounded-lg flex flex-col items-center justify-center bg-slate-50">
                         <Dumbbell className="w-12 h-12 text-slate-300 mb-3" />
@@ -208,8 +208,8 @@ export default function ExercisesPageClient({ exercisesData }: { exercisesData: 
                                     <Dumbbell className="w-12 h-12 text-slate-300" />
                                 )}
 
-                                {/* Azioni Card in Hover */}
-                                <div className="absolute top-2 right-2 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                                {/* Azioni Card in Hover (sempre visibili su mobile) */}
+                                <div className="absolute top-2 right-2 flex gap-1.5 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                     <Button
                                         size="icon"
                                         variant="secondary"

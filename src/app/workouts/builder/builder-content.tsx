@@ -232,32 +232,34 @@ export default function BuilderContent({ availableExercises, initialTemplate }: 
     return (
         <div className="space-y-6 max-w-5xl">
             {/* Header */}
-            <div className="flex items-center gap-4">
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-slate-500 hover:text-slate-900"
-                    onClick={() => router.back()}
-                >
-                    <ArrowLeft size={20} />
-                </Button>
-                <div className="flex-1">
-                    <h1 className="text-3xl font-bold text-slate-900">Workout Builder</h1>
-                    <p className="text-slate-500 mt-0.5">Crea una nuova scheda di allenamento professionale.</p>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-slate-500 hover:text-slate-900 shrink-0"
+                        onClick={() => router.back()}
+                    >
+                        <ArrowLeft size={20} />
+                    </Button>
+                    <div className="flex-1 min-w-0">
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 truncate">Workout Builder</h1>
+                        <p className="text-slate-500 mt-0.5 text-sm">Crea una nuova scheda di allenamento professionale.</p>
+                    </div>
                 </div>
-                <div className="flex gap-3">
-                    <Button onClick={handleDownloadPDF} variant="outline" className="text-slate-700 border-slate-300 bg-white hover:bg-slate-50 gap-2">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 sm:ml-auto">
+                    <Button onClick={handleDownloadPDF} variant="outline" className="text-slate-700 border-slate-300 bg-white hover:bg-slate-50 gap-2 w-full sm:w-auto">
                         <Download size={16} /> Esporta PDF
                     </Button>
-                    <Button onClick={handleSave} className="brand-bg text-white gap-2">
+                    <Button onClick={handleSave} className="brand-bg text-white gap-2 w-full sm:w-auto">
                         <Save size={16} /> Salva Template
                     </Button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Sidebar Info */}
-                <div className="md:col-span-1 space-y-6">
+                <div className="lg:col-span-1 space-y-6">
                     <Card className="bg-white border-slate-200 shadow-sm">
                         <CardHeader>
                             <CardTitle className="text-lg">Dettagli Generali</CardTitle>
@@ -302,7 +304,7 @@ export default function BuilderContent({ availableExercises, initialTemplate }: 
                 </div>
 
                 {/* Builder Area con Tabs */}
-                <div className="md:col-span-2 space-y-4">
+                <div className="lg:col-span-2 space-y-4">
                     <Card className="bg-white border-slate-200 shadow-sm min-h-[500px]">
                         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 

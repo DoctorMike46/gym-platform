@@ -108,18 +108,18 @@ export default function ServicesPageClient({ servicesData }: { servicesData: any
         <TooltipProvider delayDuration={300}>
             <div className="space-y-8">
                 {/* Header */}
-                <div className="flex justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100">
                     <div>
-                        <h1 className="text-3xl font-black text-slate-900 tracking-tight">Servizi & Listino</h1>
+                        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Servizi & Listino</h1>
                         <p className="text-slate-500 mt-1">Gestisci i pacchetti di allenamento e i piani in vendita.</p>
                     </div>
 
-                    <div className="flex gap-3">
-                        <Button variant="outline" className="text-slate-700 bg-white hover:bg-slate-50 border-slate-200" onClick={handleExportPDF}>
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+                        <Button variant="outline" className="text-slate-700 bg-white hover:bg-slate-50 border-slate-200 w-full sm:w-auto" onClick={handleExportPDF}>
                             <Download size={16} className="mr-2" />
                             Esporta Listino
                         </Button>
-                        <Button className="brand-bg text-white gap-2 shadow-sm" onClick={openCreate}>
+                        <Button className="brand-bg text-white gap-2 shadow-sm w-full sm:w-auto" onClick={openCreate}>
                             <Plus size={16} /> Nuovo Servizio
                         </Button>
                     </div>
@@ -136,7 +136,7 @@ export default function ServicesPageClient({ servicesData }: { servicesData: any
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="grid gap-6 py-6">
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="nome_servizio">Nome Pacchetto</Label>
                                         <Input id="nome_servizio" name="nome_servizio" defaultValue={editingService?.nome_servizio} placeholder="Es: Elite Coaching" required />
@@ -154,7 +154,7 @@ export default function ServicesPageClient({ servicesData }: { servicesData: any
                                     </div>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label htmlFor="prezzo">Prezzo (€)</Label>
                                         <Input id="prezzo" name="prezzo" type="number" step="0.01" defaultValue={editingService ? (editingService.prezzo / 100).toFixed(2) : ""} placeholder="99.00" required />
@@ -227,7 +227,7 @@ export default function ServicesPageClient({ servicesData }: { servicesData: any
                         <Button className="brand-bg text-white shadow-sm" onClick={openCreate}>Inizia Ora</Button>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
                         {servicesData.map((service: any) => (
                             <Card key={service.id} className="relative bg-white shadow-sm hover:shadow-md transition-shadow border-slate-200 group flex flex-col">
                                 <CardHeader className="pb-4 border-b border-slate-50">
@@ -274,7 +274,7 @@ export default function ServicesPageClient({ servicesData }: { servicesData: any
                                 </CardContent>
 
                                 {/* Actions */}
-                                <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-slate-100 flex items-center gap-1">
+                                <div className="absolute top-4 right-4 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-slate-100 flex items-center gap-1">
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-500 hover:text-blue-600" onClick={() => openEdit(service)}>

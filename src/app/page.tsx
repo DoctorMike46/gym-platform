@@ -18,17 +18,17 @@ export default async function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Dashboard</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Dashboard</h1>
           <p className="text-slate-500 mt-1">Benvenuto, Coach! Ecco una panoramica della tua attività.</p>
         </div>
-        <div className="flex gap-4">
-          <Link href="/clients">
-            <Button variant="outline" className="brand-text brand-border brand-hover-bg">Gestisci Clienti</Button>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <Link href="/clients" className="w-full sm:w-auto">
+            <Button variant="outline" className="brand-text brand-border brand-hover-bg w-full sm:w-auto">Gestisci Clienti</Button>
           </Link>
-          <Link href="/workouts/builder">
-            <Button className="brand-bg text-white">Crea Nuova Scheda</Button>
+          <Link href="/workouts/builder" className="w-full sm:w-auto">
+            <Button className="brand-bg text-white w-full sm:w-auto">Crea Nuova Scheda</Button>
           </Link>
         </div>
       </div>

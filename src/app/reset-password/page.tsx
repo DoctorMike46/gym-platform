@@ -7,31 +7,33 @@ import Link from "next/link";
 export default async function ResetPasswordPage({
     searchParams,
 }: {
-    searchParams: { token?: string };
+    searchParams: Promise<{ token?: string }>;
 }) {
     const settings = await getSettings();
-    const token = searchParams.token;
+    const { token } = await searchParams;
 
     let isValid = false;
+    let invalidReason: "expired" | "not_found" = "not_found";
     if (token) {
         const result = await validateResetToken(token);
         isValid = result.valid;
+        if (!result.valid) invalidReason = result.reason;
     }
 
     return (
         <div
-            className="min-h-screen bg-slate-50 flex items-center justify-center p-4"
+            className="min-h-screen bg-slate-50 flex items-center justify-center p-4 overflow-hidden relative"
             style={{
                 background: `linear-gradient(135deg, ${settings?.sidebar_color || "#003366"}15 0%, #f8fafc 50%, ${settings?.primary_color || "#003366"}08 100%)`,
             }}
         >
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div
-                    className="absolute -top-40 -right-40 w-96 h-96 rounded-full opacity-10 blur-3xl"
+                    className="absolute -top-40 -right-40 w-72 h-72 sm:w-96 sm:h-96 rounded-full opacity-10 blur-3xl"
                     style={{ background: settings?.primary_color || "#003366" }}
                 />
                 <div
-                    className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full opacity-10 blur-3xl"
+                    className="absolute -bottom-40 -left-40 w-72 h-72 sm:w-96 sm:h-96 rounded-full opacity-10 blur-3xl"
                     style={{ background: settings?.sidebar_color || "#003366" }}
                 />
             </div>
@@ -45,7 +47,7 @@ export default async function ResetPasswordPage({
                         }}
                     />
 
-                    <div className="p-10">
+                    <div className="p-6 sm:p-10">
                         <div className="mb-8 text-center">
                             <h1 className="text-2xl font-black text-slate-900 tracking-tight">
                                 Nuova Password
@@ -60,9 +62,13 @@ export default async function ResetPasswordPage({
                                 <div className="w-16 h-16 rounded-full bg-rose-100 flex items-center justify-center mx-auto mb-6">
                                     <AlertCircle size={32} className="text-rose-600" />
                                 </div>
-                                <h3 className="text-xl font-bold text-slate-900 mb-2">Link non Valido</h3>
+                                <h3 className="text-xl font-bold text-slate-900 mb-2">
+                                    {invalidReason === "expired" ? "Link Scaduto" : "Link non Valido"}
+                                </h3>
                                 <p className="text-slate-500 text-sm leading-relaxed mb-8">
-                                    Il link di ripristino è scaduto o non è valido. Richiedine uno nuovo.
+                                    {invalidReason === "expired"
+                                        ? "Il link di ripristino è scaduto. Richiedine uno nuovo per continuare."
+                                        : "Il link di ripristino non è valido. Richiedine uno nuovo per continuare."}
                                 </p>
                                 <Link
                                     href="/forgot-password"

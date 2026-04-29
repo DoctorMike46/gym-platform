@@ -94,3 +94,12 @@ export function generateAnnouncementR2Key(trainerId: number, fileName: string): 
     const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
     return `trainers/${trainerId}/announcements/${timestamp}_${sanitized}`;
 }
+
+/**
+ * Genera una chiave R2 per una foto progresso del cliente
+ */
+export function generateProgressPhotoKey(clientId: number, type: string, fileName: string): string {
+    const timestamp = Date.now();
+    const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    return `clients/${clientId}/progress/${timestamp}_${type}_${sanitized}`;
+}

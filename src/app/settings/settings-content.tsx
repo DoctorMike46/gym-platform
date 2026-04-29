@@ -99,12 +99,12 @@ export default function SettingsContent({ settingsData }: { settingsData: any })
             <input type="hidden" name="logo_url" value={logoUrl} />
             <input type="hidden" name="sidebar_logo_url" value={sidebarLogoUrl} />
 
-            <div className="flex justify-between items-end">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-3">
                 <div>
-                    <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Impostazioni Brand</h1>
+                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Impostazioni Brand</h1>
                     <p className="text-slate-500 mt-1">Personalizza l'estetica della tua piattaforma.</p>
                 </div>
-                <Button type="submit" disabled={isSaving} className="brand-bg text-white gap-2 shadow-lg px-6 h-11">
+                <Button type="submit" disabled={isSaving} className="brand-bg text-white gap-2 shadow-lg px-6 h-11 w-full sm:w-auto">
                     {isSaving ? "Salvataggio..." : <><Save size={18} /> Salva Cambiamenti</>}
                 </Button>
             </div>
@@ -119,13 +119,13 @@ export default function SettingsContent({ settingsData }: { settingsData: any })
                         </div>
                         <CardDescription>Nome della piattaforma e configurazione colori.</CardDescription>
                     </CardHeader>
-                    <CardContent className="p-6 space-y-6">
+                    <CardContent className="p-4 sm:p-6 space-y-6">
                         <div className="space-y-3">
                             <Label htmlFor="site_name" className="text-sm font-semibold text-slate-700">Nome Piattaforma / Brand</Label>
                             <Input id="site_name" name="site_name" defaultValue={settingsData?.site_name || "Ernesto Performance"} className="max-w-md" />
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
                             {/* Primary Color */}
                             <ColorPicker
                                 label="Colore Primario (Pulsanti & Accenti)"
@@ -168,8 +168,8 @@ export default function SettingsContent({ settingsData }: { settingsData: any })
                         </div>
                         <CardDescription>Le immagini vengono caricate immediatamente. Salva per confermare.</CardDescription>
                     </CardHeader>
-                    <CardContent className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <CardContent className="p-4 sm:p-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                             {/* Logo Esteso */}
                             <div className="space-y-3">
                                 <Label className="text-sm font-semibold text-slate-700">Logo Sidebar (Versione Estesa)</Label>
@@ -235,7 +235,7 @@ export default function SettingsContent({ settingsData }: { settingsData: any })
                         </div>
                         <CardDescription>Modifica i testi stampati nei PDF del Listino Servizi e delle Schede di Allenamento.</CardDescription>
                     </CardHeader>
-                    <CardContent className="p-6 space-y-6">
+                    <CardContent className="p-4 sm:p-6 space-y-6">
                         <div className="space-y-3">
                             <Label className="text-sm font-semibold text-slate-700">Titolo Intestazione Listino Servizi</Label>
                             <Input
@@ -344,7 +344,7 @@ function UploadArea({ onClick, onDrop, isUploading, hint, icon = "upload" }: {
             onClick={onClick}
             onDrop={onDrop}
             onDragOver={(e) => e.preventDefault()}
-            className="group border-2 border-dashed border-slate-200 rounded-3xl p-8 text-center bg-slate-50/50 hover:bg-white brand-hover-border transition-all cursor-pointer flex flex-col items-center gap-3"
+            className="group border-2 border-dashed border-slate-200 rounded-3xl p-6 sm:p-8 text-center bg-slate-50/50 hover:bg-white brand-hover-border transition-all cursor-pointer flex flex-col items-center gap-3"
         >
             <div className="w-12 h-12 rounded-full bg-slate-100 group-hover:bg-blue-50 flex items-center justify-center text-slate-400 brand-hover-text transition-colors">
                 {isUploading ? (

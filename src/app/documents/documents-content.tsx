@@ -250,22 +250,22 @@ export default function DocumentsContent({
                                 </>
                             )}
                         </div>
-                        <div className="flex items-center justify-between gap-4">
-                            <div className="flex items-center gap-2">
-                                <FolderOpen className="w-8 h-8 brand-text" />
-                                <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <FolderOpen className="w-7 h-7 sm:w-8 sm:h-8 brand-text shrink-0" />
+                                <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight truncate">
                                     {selectedFolder ? TIPO_OPTIONS.find(o => o.value === selectedFolder)?.label : (selectedClient ? "Cartelle" : "Documenti")}
                                 </h1>
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
                                 {selectedFolder === 'foto_progresso' && (
-                                    <div className="flex bg-slate-100 p-1 rounded-xl mr-2">
+                                    <div className="flex bg-slate-100 p-1 rounded-xl">
                                         <Button
                                             variant={viewMode === 'grid' ? 'secondary' : 'ghost'}
                                             size="sm"
                                             onClick={() => setViewMode('grid')}
-                                            className={`h-8 px-3 rounded-lg ${viewMode === 'grid' ? 'bg-white shadow-sm hover:bg-white' : ''}`}
+                                            className={`flex-1 h-8 px-3 rounded-lg ${viewMode === 'grid' ? 'bg-white shadow-sm hover:bg-white' : ''}`}
                                         >
                                             <LayoutGrid className="w-4 h-4 mr-2" />
                                             Grid
@@ -274,7 +274,7 @@ export default function DocumentsContent({
                                             variant={viewMode === 'table' ? 'secondary' : 'ghost'}
                                             size="sm"
                                             onClick={() => setViewMode('table')}
-                                            className={`h-8 px-3 rounded-lg ${viewMode === 'table' ? 'bg-white shadow-sm hover:bg-white' : ''}`}
+                                            className={`flex-1 h-8 px-3 rounded-lg ${viewMode === 'table' ? 'bg-white shadow-sm hover:bg-white' : ''}`}
                                         >
                                             <List className="w-4 h-4 mr-2" />
                                             Lista
@@ -283,7 +283,7 @@ export default function DocumentsContent({
                                 )}
                                 <Button
                                     onClick={openUpload}
-                                    className="brand-bg text-white hover:opacity-90 transition-all shadow-lg shadow-brand-500/20 px-6 h-11 rounded-2xl font-semibold gap-2"
+                                    className="brand-bg text-white hover:opacity-90 transition-all shadow-lg shadow-brand-500/20 px-6 h-11 rounded-2xl font-semibold gap-2 w-full sm:w-auto"
                                 >
                                     <Upload className="w-5 h-5" />
                                     Carica File
@@ -439,11 +439,11 @@ export default function DocumentsContent({
                                 )}
                             </div>
                         ) : (
-                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-300">
-                                <Table>
+                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden overflow-x-auto animate-in fade-in slide-in-from-bottom-2 duration-300">
+                                <Table className="min-w-[640px]">
                                     <TableHeader>
                                         <TableRow className="bg-slate-50 hover:bg-slate-50">
-                                            <TableHead className="w-[400px] font-semibold text-slate-700">File</TableHead>
+                                            <TableHead className="min-w-[260px] font-semibold text-slate-700">File</TableHead>
                                             <TableHead className="font-semibold text-slate-700">Dimensione</TableHead>
                                             <TableHead className="font-semibold text-slate-700">Data Documento</TableHead>
                                             <TableHead className="text-right font-semibold text-slate-700">Azioni</TableHead>
@@ -551,7 +551,7 @@ export default function DocumentsContent({
                         <div className="p-6 space-y-5 bg-white">
                             <form onSubmit={handleUpload} className="space-y-5">
                                 <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
                                             <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-1.5">
                                                 <User className="w-3.5 h-3.5 brand-text" />
@@ -625,7 +625,7 @@ export default function DocumentsContent({
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
                                             <label className="text-sm font-semibold text-slate-700 ml-1 flex items-center gap-1.5">
                                                 <CalendarIcon className="w-3.5 h-3.5 brand-text" />

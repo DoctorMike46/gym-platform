@@ -79,13 +79,13 @@ export default function WorkoutsContent({ templates }: { templates: any[] }) {
     return (
         <TooltipProvider delayDuration={300}>
             <div className="space-y-6">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-900">Programmi di Allenamento</h1>
+                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">Programmi di Allenamento</h1>
                         <p className="text-slate-500 mt-1">Gestisci i tuoi template e assegnali ai tuoi atleti.</p>
                     </div>
-                    <Link href="/workouts/builder">
-                        <Button className="brand-bg text-white gap-2">
+                    <Link href="/workouts/builder" className="w-full sm:w-auto">
+                        <Button className="brand-bg text-white gap-2 w-full sm:w-auto">
                             <Plus size={16} /> Crea Nuovo Programma
                         </Button>
                     </Link>
@@ -140,11 +140,11 @@ export default function WorkoutsContent({ templates }: { templates: any[] }) {
                     </div>
                 </div>
 
-                <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden">
+                <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
                     <Table>
                         <TableHeader className="bg-slate-50">
                             <TableRow className="hover:bg-slate-50 border-slate-200">
-                                <TableHead className="text-slate-700 font-semibold w-[400px]">Nome Programma</TableHead>
+                                <TableHead className="text-slate-700 font-semibold min-w-[200px]">Nome Programma</TableHead>
                                 <TableHead className="text-slate-700 font-semibold">Split</TableHead>
                                 <TableHead className="text-slate-700 font-semibold">Data Creazione</TableHead>
                                 <TableHead className="text-right text-slate-700 font-semibold">Azioni</TableHead>
