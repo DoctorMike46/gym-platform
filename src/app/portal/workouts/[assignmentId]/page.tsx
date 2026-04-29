@@ -4,7 +4,7 @@ import { requireClientAuth } from "@/lib/client-auth";
 import { getClientWorkoutDetail, getWorkoutLogHistory } from "@/lib/actions/portal-workouts";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Play, Clock } from "lucide-react";
+import { ArrowLeft, Play, Clock, ChevronDown } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +32,13 @@ export default async function WorkoutDetailPage({
         days.set(g, arr);
     }
 
+    const inProgressDay = history.find((h) => h.status === "in_progress")?.giorno;
+    const completedTodayDays = new Set(
+        history
+            .filter((h) => h.date_executed === today && h.status === "completed")
+            .map((h) => h.giorno)
+    );
+
     return (
         <div className="space-y-6">
             <Link href="/portal/workouts" className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700">
@@ -52,47 +59,70 @@ export default async function WorkoutDetailPage({
                 </Card>
             )}
 
-            <div className="space-y-6">
-                {Array.from(days.entries()).sort(([a], [b]) => a - b).map(([day, exs]) => (
-                    <div key={day}>
-                        <div className="flex items-center justify-between mb-3">
-                            <h2 className="text-lg font-bold text-slate-900">Giorno {day}</h2>
-                            <Link
-                                href={`/portal/workouts/${id}/log/${today}?giorno=${day}`}
-                                className="inline-flex items-center gap-2 h-9 px-4 rounded-lg text-white text-xs font-semibold bg-slate-900 hover:bg-slate-800 transition"
-                            >
-                                <Play size={14} /> Inizia
-                            </Link>
-                        </div>
-                        <div className="space-y-3">
-                            {exs.map((e) => (
-                                <Card key={e.te.id}>
-                                    <CardContent className="py-4">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0 flex-1">
-                                                <p className="font-semibold text-slate-900">{e.ex?.nome}</p>
-                                                {e.ex?.gruppo_muscolare && (
-                                                    <Badge variant="outline" className="mt-1 text-[10px]">
-                                                        {e.ex.gruppo_muscolare}
-                                                    </Badge>
-                                                )}
-                                                <div className="flex flex-wrap gap-3 text-xs text-slate-500 mt-2">
-                                                    {e.te.serie && <span>{e.te.serie} serie</span>}
-                                                    {e.te.ripetizioni && <span>• {e.te.ripetizioni} reps</span>}
-                                                    {e.te.recupero && <span>• {e.te.recupero} rec.</span>}
-                                                    {e.te.rpe && <span>• RPE {e.te.rpe}</span>}
+            <div className="space-y-3">
+                {Array.from(days.entries()).sort(([a], [b]) => a - b).map(([day, exs]) => {
+                    const completedToday = completedTodayDays.has(day);
+                    const inProgress = day === inProgressDay;
+                    return (
+                        <details
+                            key={day}
+                            open={inProgress}
+                            className="group bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm transition-shadow open:shadow-md"
+                        >
+                            <summary className="cursor-pointer list-none marker:hidden [&::-webkit-details-marker]:hidden p-4 flex items-center gap-3">
+                                <ChevronDown
+                                    size={18}
+                                    className="text-slate-400 transition-transform duration-200 group-open:rotate-180 shrink-0"
+                                />
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-bold text-slate-900">Giorno {day}</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        {exs.length} {exs.length === 1 ? "esercizio" : "esercizi"}
+                                        {inProgress && (
+                                            <> · <span className="text-amber-600 font-medium">In corso</span></>
+                                        )}
+                                        {completedToday && !inProgress && (
+                                            <> · <span className="text-emerald-600 font-medium">Completato oggi</span></>
+                                        )}
+                                    </p>
+                                </div>
+                                <Link
+                                    href={`/portal/workouts/${id}/log/${today}?giorno=${day}`}
+                                    className="inline-flex items-center gap-2 h-9 px-4 rounded-lg text-white text-xs font-semibold bg-slate-900 hover:bg-slate-800 transition shrink-0"
+                                >
+                                    <Play size={14} /> {inProgress ? "Riprendi" : "Inizia"}
+                                </Link>
+                            </summary>
+                            <div className="border-t border-slate-100 p-4 space-y-3 bg-slate-50/30">
+                                {exs.map((e) => (
+                                    <Card key={e.te.id} className="border-slate-100 bg-white">
+                                        <CardContent className="py-4">
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-semibold text-slate-900">{e.ex?.nome}</p>
+                                                    {e.ex?.gruppo_muscolare && (
+                                                        <Badge variant="outline" className="mt-1 text-[10px]">
+                                                            {e.ex.gruppo_muscolare}
+                                                        </Badge>
+                                                    )}
+                                                    <div className="flex flex-wrap gap-3 text-xs text-slate-500 mt-2">
+                                                        {e.te.serie && <span>{e.te.serie} serie</span>}
+                                                        {e.te.ripetizioni && <span>• {e.te.ripetizioni} reps</span>}
+                                                        {e.te.recupero && <span>• {e.te.recupero} rec.</span>}
+                                                        {e.te.rpe && <span>• RPE {e.te.rpe}</span>}
+                                                    </div>
+                                                    {e.te.note_tecniche && (
+                                                        <p className="text-xs text-slate-600 mt-2 italic">{e.te.note_tecniche}</p>
+                                                    )}
                                                 </div>
-                                                {e.te.note_tecniche && (
-                                                    <p className="text-xs text-slate-600 mt-2 italic">{e.te.note_tecniche}</p>
-                                                )}
                                             </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
-                        </div>
-                    </div>
-                ))}
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        </details>
+                    );
+                })}
             </div>
 
             {history.length > 0 && (
