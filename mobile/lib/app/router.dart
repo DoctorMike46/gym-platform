@@ -9,11 +9,13 @@ import '../features/auth/presentation/splash_page.dart';
 import '../features/documents/presentation/documents_page.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/home/presentation/main_shell.dart';
+import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/progress/presentation/progress_page.dart';
 import '../features/workouts/presentation/assignment_detail_page.dart';
 import '../features/workouts/presentation/assignments_list_page.dart';
 import '../features/workouts/presentation/session_player_page.dart';
+import '../features/workouts/presentation/workout_history_page.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   // Non `watch` di authControllerProvider qui per evitare ricreazione del router:
@@ -50,6 +52,12 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/login',
         builder: (context, state) => const LoginPage(),
       ),
+      GoRoute(
+        path: '/onboarding-tour',
+        builder: (context, state) => OnboardingPage(
+          onDone: () => context.go('/home'),
+        ),
+      ),
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
         routes: [
@@ -83,6 +91,13 @@ final routerProvider = Provider<GoRouter>((ref) {
           return AssignmentDetailPage(assignmentId: id);
         },
         routes: [
+          GoRoute(
+            path: 'history',
+            builder: (context, state) {
+              final id = int.parse(state.pathParameters['id']!);
+              return WorkoutHistoryPage(assignmentId: id);
+            },
+          ),
           GoRoute(
             path: 'sessions/:logId',
             builder: (context, state) {

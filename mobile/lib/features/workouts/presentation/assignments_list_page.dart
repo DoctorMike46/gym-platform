@@ -112,17 +112,39 @@ class _AssignmentCard extends StatelessWidget {
     final dateStr = formatDateItShort(item.assignment.dataAssegnazione);
 
     if (primary) {
-      return GradientCard(
-        onTap: () => context.push('/workouts/${item.assignment.id}'),
-        child: _CardContent(
-          name: name,
-          split: split,
-          dateStr: dateStr,
-          textColor: AppColors.white,
-          subColor: AppColors.white.withValues(alpha: 0.85),
-          badge: 'ATTIVA',
-          badgeColor: AppColors.white.withValues(alpha: 0.18),
-          chevronColor: AppColors.white,
+      return Hero(
+        tag: 'assignment-${item.assignment.id}',
+        flightShuttleBuilder: (_, anim, _, _, _) {
+          // durante il flight, niente shadow (eviti sfarfallio)
+          return Material(
+            color: Colors.transparent,
+            child: GradientCard(
+              onTap: null,
+              child: _CardContent(
+                name: name,
+                split: split,
+                dateStr: dateStr,
+                textColor: AppColors.white,
+                subColor: AppColors.white.withValues(alpha: 0.85),
+                badge: 'ATTIVA',
+                badgeColor: AppColors.white.withValues(alpha: 0.18),
+                chevronColor: AppColors.white,
+              ),
+            ),
+          );
+        },
+        child: GradientCard(
+          onTap: () => context.push('/workouts/${item.assignment.id}'),
+          child: _CardContent(
+            name: name,
+            split: split,
+            dateStr: dateStr,
+            textColor: AppColors.white,
+            subColor: AppColors.white.withValues(alpha: 0.85),
+            badge: 'ATTIVA',
+            badgeColor: AppColors.white.withValues(alpha: 0.18),
+            chevronColor: AppColors.white,
+          ),
         ),
       );
     }

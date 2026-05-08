@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/theme/theme_controller.dart';
+import '../../../core/widgets/branding_logo.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/presentation/auth_controller.dart';
@@ -18,6 +19,7 @@ class ProfilePage extends ConsumerWidget {
     final theme = Theme.of(context);
     final auth = ref.watch(authControllerProvider);
     final profile = auth.profile;
+    final branding = auth.branding;
     final themeMode = ref.watch(themeControllerProvider);
 
     return Scaffold(
@@ -41,51 +43,76 @@ class ProfilePage extends ConsumerWidget {
               ),
               borderRadius: BorderRadius.circular(AppRadius.xl),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    color: AppColors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    _initials(profile?.fullName),
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                if (branding?.siteName != null)
+                  Row(
                     children: [
-                      Text(
-                        profile?.fullName ?? 'Atleta',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.white,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                      if (profile?.email != null) ...[
-                        const SizedBox(height: 2),
-                        Text(
-                          profile!.email,
+                      BrandingLogo(url: branding?.logoUrl, size: 32),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          branding!.siteName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 13,
+                            fontWeight: FontWeight.w600,
                             color: AppColors.white.withValues(alpha: 0.85),
                           ),
                         ),
-                      ],
+                      ),
                     ],
                   ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: AppColors.white.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      alignment: Alignment.center,
+                      child: Text(
+                        _initials(profile?.fullName),
+                        style: const TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            profile?.fullName ?? 'Atleta',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: AppColors.white,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          if (profile?.email != null) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              profile!.email,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: AppColors.white.withValues(alpha: 0.85),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -93,6 +120,14 @@ class ProfilePage extends ConsumerWidget {
 
           const SizedBox(height: 24),
           _SectionTitle(title: 'Account'),
+          _SettingTile(
+            icon: Icons.person_outline_rounded,
+            title: 'Modifica profilo',
+            subtitle: profile?.telefono != null && profile!.telefono!.isNotEmpty
+                ? 'Tel: ${profile.telefono}'
+                : 'Aggiungi telefono',
+            onTap: () => _showEditProfile(context, ref, profile),
+          ),
           _SettingTile(
             icon: Icons.lock_outline_rounded,
             title: 'Cambia password',
@@ -162,6 +197,22 @@ class ProfilePage extends ConsumerWidget {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (_) => const _ChangePasswordSheet(),
+    );
+  }
+
+  Future<void> _showEditProfile(
+    BuildContext context,
+    WidgetRef ref,
+    dynamic profile,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => _EditProfileSheet(initialPhone: profile?.telefono),
     );
   }
 
@@ -350,6 +401,103 @@ class _ThemeToggleTile extends ConsumerWidget {
             },
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ───────────────────────────── Edit Profile Sheet ─────────────────────────────
+
+class _EditProfileSheet extends ConsumerStatefulWidget {
+  const _EditProfileSheet({this.initialPhone});
+  final String? initialPhone;
+
+  @override
+  ConsumerState<_EditProfileSheet> createState() => _EditProfileSheetState();
+}
+
+class _EditProfileSheetState extends ConsumerState<_EditProfileSheet> {
+  late final TextEditingController _phoneCtrl =
+      TextEditingController(text: widget.initialPhone ?? '');
+  bool _saving = false;
+
+  @override
+  void dispose() {
+    _phoneCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final ok = await ref.read(authControllerProvider.notifier).updateProfile(
+          telefono: _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+        );
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (ok) {
+      Navigator.of(context).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profilo aggiornato')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Errore aggiornamento')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final inset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: inset),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: theme.dividerColor,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text('Modifica profilo', style: theme.textTheme.headlineSmall),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _phoneCtrl,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Telefono',
+                prefixIcon: Icon(Icons.phone_outlined),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Per modificare nome, email o altri dati, contatta il tuo trainer.',
+              style: theme.textTheme.bodySmall,
+            ),
+            const SizedBox(height: 20),
+            PrimaryButton(
+              label: 'Salva',
+              icon: Icons.save_rounded,
+              onPressed: _saving ? null : _save,
+              loading: _saving,
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: _saving ? null : () => Navigator.of(context).pop(),
+              child: const Text('Annulla'),
+            ),
+          ],
+        ),
       ),
     );
   }

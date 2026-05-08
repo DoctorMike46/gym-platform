@@ -49,6 +49,12 @@ class AuthRepository {
     return access != null && access.isNotEmpty && refresh != null && refresh.isNotEmpty;
   }
 
+  Future<void> requestPasswordReset(String email) =>
+      api.requestPasswordReset(email);
+
+  Future<void> updateProfile({String? telefono}) =>
+      api.updateProfile(telefono: telefono);
+
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,

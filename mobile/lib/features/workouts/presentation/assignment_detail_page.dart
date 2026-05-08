@@ -123,6 +123,27 @@ class _DetailContentState extends ConsumerState<_DetailContent>
           ),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Storico allenamenti',
+            icon: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.25),
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const Icon(
+                Icons.history_rounded,
+                color: AppColors.white,
+                size: 20,
+              ),
+            ),
+            onPressed: () => context.push('/workouts/${assignment.id}/history'),
+          ),
+          const SizedBox(width: 8),
+        ],
         iconTheme: const IconThemeData(color: AppColors.white),
         systemOverlayStyle: SystemUiOverlayStyle.light,
       ),
@@ -138,10 +159,23 @@ class _DetailContentState extends ConsumerState<_DetailContent>
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _HeroHeader(
-            templateName: template.nomeTemplate,
-            dateStr: dateStr,
-            splitSettimanale: template.splitSettimanale,
+          Hero(
+            tag: 'assignment-${assignment.id}',
+            flightShuttleBuilder: (_, anim, _, _, _) {
+              return Material(
+                color: Colors.transparent,
+                child: _HeroHeader(
+                  templateName: template.nomeTemplate,
+                  dateStr: dateStr,
+                  splitSettimanale: template.splitSettimanale,
+                ),
+              );
+            },
+            child: _HeroHeader(
+              templateName: template.nomeTemplate,
+              dateStr: dateStr,
+              splitSettimanale: template.splitSettimanale,
+            ),
           ),
           if (hasNotes)
             Padding(

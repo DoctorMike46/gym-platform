@@ -108,14 +108,33 @@ class WorkoutsApi {
     }
   }
 
+  Future<Map<String, dynamic>> getLastExerciseLogsBulk(
+      List<int> templateExerciseIds) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/api/v1/workouts/exercises/last-logs',
+        data: {'template_exercise_ids': templateExerciseIds},
+      );
+      _ensureOk(response);
+      final data = response.data!['data'] as Map<String, dynamic>;
+      final logs = data['logs'];
+      return logs is Map<String, dynamic> ? logs : {};
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
   Future<void> finishSession({
     required int logId,
     required int totalDurationSeconds,
+    String? note,
   }) async {
+    final body = <String, dynamic>{'total_duration_seconds': totalDurationSeconds};
+    if (note != null && note.isNotEmpty) body['note'] = note;
     try {
       final response = await _dio.post<Map<String, dynamic>>(
         '/api/v1/workouts/sessions/$logId/finish',
-        data: {'total_duration_seconds': totalDurationSeconds},
+        data: body,
       );
       _ensureOk(response);
     } on DioException catch (e) {

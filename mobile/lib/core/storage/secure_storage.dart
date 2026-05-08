@@ -8,6 +8,7 @@ class SecureStorage {
   static const _kRefreshToken = 'refresh_token';
   static const _kClientId = 'client_id';
   static const _kThemeMode = 'theme_mode';
+  static const _kOnboardingDone = 'onboarding_done';
 
   final FlutterSecureStorage _storage;
 
@@ -36,6 +37,14 @@ class SecureStorage {
 
   Future<void> writeThemeMode(String mode) =>
       _storage.write(key: _kThemeMode, value: mode);
+
+  Future<bool> isOnboardingDone() async {
+    final v = await _storage.read(key: _kOnboardingDone);
+    return v == '1';
+  }
+
+  Future<void> markOnboardingDone() =>
+      _storage.write(key: _kOnboardingDone, value: '1');
 
   Future<void> clearSession() async {
     await Future.wait([

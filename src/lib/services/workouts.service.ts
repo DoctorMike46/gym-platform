@@ -188,7 +188,8 @@ export async function saveClientExerciseLog(
 export async function finishClientWorkoutSession(
     session: ClientSession,
     workoutLogId: number,
-    totalDurationSeconds: number
+    totalDurationSeconds: number,
+    extra: { note?: string | null } = {}
 ): Promise<{ success: true }> {
     const log = await ensureLogOwnership(workoutLogId, session.id);
 
@@ -197,6 +198,7 @@ export async function finishClientWorkoutSession(
         .set({
             status: "completed",
             total_duration_seconds: totalDurationSeconds,
+            note: extra.note ?? log.note ?? null,
             updated_at: new Date(),
         })
         .where(eq(workout_logs.id, workoutLogId));
@@ -266,6 +268,65 @@ export async function listClientWorkoutLogHistory(
             )
         )
         .orderBy(desc(workout_logs.date_executed));
+}
+
+/**
+ * Restituisce l'ultimo log "completed" del cliente per uno specifico
+ * template_exercise. Usato per pre-populate il session player con i valori
+ * della sessione precedente.
+ */
+export async function getClientLastExerciseLog(
+    session: ClientSession,
+    templateExerciseId: number
+) {
+    const rows = await db
+        .select({
+            log: workout_exercise_logs,
+            workoutLog: workout_logs,
+        })
+        .from(workout_exercise_logs)
+        .leftJoin(workout_logs, eq(workout_logs.id, workout_exercise_logs.workout_log_id))
+        .where(
+            and(
+                eq(workout_exercise_logs.template_exercise_id, templateExerciseId),
+                eq(workout_logs.client_id, session.id),
+                eq(workout_logs.status, "completed")
+            )
+        )
+        .orderBy(desc(workout_logs.date_executed), desc(workout_logs.id))
+        .limit(1);
+
+    if (rows.length === 0) return null;
+    const r = rows[0];
+    if (!r.workoutLog) return null;
+    return {
+        date_executed: r.workoutLog.date_executed,
+        sets_completed: r.log.sets_completed,
+        reps_actual: r.log.reps_actual,
+        weight_actual: r.log.weight_actual,
+        rpe_actual: r.log.rpe_actual,
+        note: r.log.note,
+    };
+}
+
+/**
+ * Versione bulk per più template_exercise_id in una sola query: utile per
+ * il session player che pre-popola tutti gli esercizi del giorno all'avvio.
+ */
+export async function getClientLastExerciseLogsBulk(
+    session: ClientSession,
+    templateExerciseIds: number[]
+): Promise<Record<number, Awaited<ReturnType<typeof getClientLastExerciseLog>>>> {
+    if (templateExerciseIds.length === 0) return {};
+    const result: Record<number, Awaited<ReturnType<typeof getClientLastExerciseLog>>> = {};
+    // Esecuzione parallela: ogni esercizio è una query separata che usa l'indice
+    // (template_exercise_id, status). Per N piccoli (~15) è fine.
+    await Promise.all(
+        templateExerciseIds.map(async (id) => {
+            result[id] = await getClientLastExerciseLog(session, id);
+        })
+    );
+    return result;
 }
 
 export async function getClientWorkoutLogDetail(

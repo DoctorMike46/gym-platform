@@ -7,6 +7,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../shared/utils/date_format_it.dart';
 import '../data/progress_repository.dart';
 import '../domain/progress_models.dart';
@@ -93,9 +94,11 @@ class MeasurementsTab extends ConsumerWidget {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
                 children: [
                   _WeightChartCard(measurements: sorted),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 16),
+                  const _TrainingStatsCards(),
+                  const SizedBox(height: 4),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+                    padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
                     child: Text(
                       'Storico',
                       style: Theme.of(context).textTheme.labelMedium?.copyWith(
@@ -302,6 +305,303 @@ class _WeightChartCard extends StatelessWidget {
       ),
     );
   }
+}
+
+// ───────────────────────────── Training Stats Cards ─────────────────────────────
+
+class _TrainingStatsCards extends ConsumerWidget {
+  const _TrainingStatsCards();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final asyncStats = ref.watch(progressTrainingStatsProvider);
+    return asyncStats.when(
+      loading: () => const _StatsCardsSkeleton(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (s) {
+        final hasVolume = s.weeklyVolume.any((w) => w.volume > 0);
+        final hasGroups = s.muscleGroups.isNotEmpty;
+        if (!hasVolume && !hasGroups) return const SizedBox.shrink();
+        return Column(
+          children: [
+            if (hasVolume) _VolumeChartCard(weeks: s.weeklyVolume),
+            if (hasVolume && hasGroups) const SizedBox(height: 16),
+            if (hasGroups) _MuscleGroupsCard(groups: s.muscleGroups),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _StatsCardsSkeleton extends StatelessWidget {
+  const _StatsCardsSkeleton();
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: const [
+        Skeleton(height: 200, radius: 16),
+        SizedBox(height: 16),
+        Skeleton(height: 200, radius: 16),
+      ],
+    );
+  }
+}
+
+class _VolumeChartCard extends StatelessWidget {
+  const _VolumeChartCard({required this.weeks});
+  final List<WeeklyVolumeBucket> weeks;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final maxVol = weeks.fold<int>(0, (m, w) => w.volume > m ? w.volume : m);
+    final totalVol = weeks.fold<int>(0, (a, w) => a + w.volume);
+    final lastVol = weeks.isNotEmpty ? weeks.last.volume : 0;
+
+    String fmtVol(int v) {
+      if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}k';
+      return v.toString();
+    }
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Volume settimanale',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const Spacer(),
+              Text(
+                'Tot: ${fmtVol(totalVol)} kg',
+                style: theme.textTheme.bodySmall,
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            lastVol > 0
+                ? 'Questa settimana: ${fmtVol(lastVol)} kg'
+                : 'Questa settimana: nessun allenamento',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 110,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                for (var i = 0; i < weeks.length; i++) ...[
+                  Expanded(
+                    child: _VolumeBar(
+                      week: weeks[i],
+                      maxVol: maxVol,
+                      isLast: i == weeks.length - 1,
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
+                  if (i != weeks.length - 1) const SizedBox(width: 6),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              for (var i = 0; i < weeks.length; i++) ...[
+                Expanded(
+                  child: Text(
+                    _shortLabel(weeks[i].weekStart),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.textTheme.bodySmall?.color,
+                    ),
+                  ),
+                ),
+                if (i != weeks.length - 1) const SizedBox(width: 6),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _shortLabel(DateTime d) {
+    final months = [
+      'gen', 'feb', 'mar', 'apr', 'mag', 'giu',
+      'lug', 'ago', 'set', 'ott', 'nov', 'dic',
+    ];
+    return '${d.day}/${months[d.month - 1]}';
+  }
+}
+
+class _VolumeBar extends StatelessWidget {
+  const _VolumeBar({
+    required this.week,
+    required this.maxVol,
+    required this.isLast,
+    required this.color,
+  });
+  final WeeklyVolumeBucket week;
+  final int maxVol;
+  final bool isLast;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ratio = maxVol > 0 ? (week.volume / maxVol).clamp(0.05, 1.0) : 0.05;
+    return Column(
+      mainAxisAlignment: MainAxisAlignment.end,
+      children: [
+        if (week.volume > 0)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Text(
+              week.volume >= 1000
+                  ? '${(week.volume / 1000).toStringAsFixed(1)}k'
+                  : week.volume.toString(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        Container(
+          height: (ratio * 80).toDouble(),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                isLast
+                    ? color
+                    : color.withValues(alpha: 0.55),
+                color.withValues(alpha: isLast ? 0.65 : 0.3),
+              ],
+            ),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MuscleGroupsCard extends StatelessWidget {
+  const _MuscleGroupsCard({required this.groups});
+  final List<MuscleGroupBucket> groups;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final total = groups.fold<int>(0, (a, b) => a + b.count);
+    final maxCount = groups.fold<int>(0, (m, g) => g.count > m ? g.count : m);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Distribuzione gruppi muscolari',
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 4),
+          Text(
+            'Ultimi 30 giorni · $total esercizi loggati',
+            style: theme.textTheme.bodySmall,
+          ),
+          const SizedBox(height: 14),
+          for (final g in groups)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _MuscleGroupRow(
+                group: g,
+                ratio: maxCount > 0 ? g.count / maxCount : 0,
+                primary: theme.colorScheme.primary,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MuscleGroupRow extends StatelessWidget {
+  const _MuscleGroupRow({
+    required this.group,
+    required this.ratio,
+    required this.primary,
+  });
+
+  final MuscleGroupBucket group;
+  final double ratio;
+  final Color primary;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              _capitalize(group.gruppo),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            Text(
+              '${group.count}',
+              style: theme.textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Container(
+          height: 6,
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surfaceContainerHighest,
+            borderRadius: BorderRadius.circular(3),
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: ratio.clamp(0.05, 1.0),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [primary, primary.withValues(alpha: 0.6)],
+                ),
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _capitalize(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
 }
 
 class _MeasurementRow extends ConsumerWidget {
@@ -625,11 +925,19 @@ class _NumField extends StatelessWidget {
 class _LoadingState extends StatelessWidget {
   const _LoadingState();
   @override
-  Widget build(BuildContext context) =>
-      ListView(physics: const AlwaysScrollableScrollPhysics(), children: [
-        const SizedBox(height: 80),
-        const Center(child: CircularProgressIndicator()),
-      ]);
+  Widget build(BuildContext context) => ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+        children: const [
+          Skeleton(height: 220, radius: 16),
+          SizedBox(height: 16),
+          Skeleton(height: 80, radius: 12),
+          SizedBox(height: 12),
+          Skeleton(height: 80, radius: 12),
+          SizedBox(height: 12),
+          Skeleton(height: 80, radius: 12),
+        ],
+      );
 }
 
 class _EmptyMeasurementsState extends StatelessWidget {

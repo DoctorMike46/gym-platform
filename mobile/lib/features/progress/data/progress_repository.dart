@@ -112,3 +112,46 @@ final photosProvider = FutureProvider<List<ProgressPhoto>>((ref) async {
   final repo = ref.watch(progressRepositoryProvider);
   return repo.listPhotos();
 });
+
+class WeeklyVolumeBucket {
+  const WeeklyVolumeBucket({required this.weekStart, required this.volume});
+  final DateTime weekStart;
+  final int volume;
+}
+
+class MuscleGroupBucket {
+  const MuscleGroupBucket({required this.gruppo, required this.count});
+  final String gruppo;
+  final int count;
+}
+
+class ProgressTrainingStats {
+  const ProgressTrainingStats({
+    required this.weeklyVolume,
+    required this.muscleGroups,
+  });
+  final List<WeeklyVolumeBucket> weeklyVolume;
+  final List<MuscleGroupBucket> muscleGroups;
+}
+
+final progressTrainingStatsProvider =
+    FutureProvider<ProgressTrainingStats>((ref) async {
+  final dio = ref.watch(dioProvider);
+  final r = await dio.get<Map<String, dynamic>>('/api/v1/progress/stats');
+  final data = r.data!['data'] as Map<String, dynamic>;
+  final weeks = (data['weekly_volume'] as List<dynamic>)
+      .cast<Map<String, dynamic>>()
+      .map((e) => WeeklyVolumeBucket(
+            weekStart: DateTime.parse(e['week_start'] as String),
+            volume: (e['volume'] as num).toInt(),
+          ))
+      .toList();
+  final groups = (data['muscle_groups'] as List<dynamic>)
+      .cast<Map<String, dynamic>>()
+      .map((e) => MuscleGroupBucket(
+            gruppo: e['gruppo']?.toString() ?? 'Altro',
+            count: (e['count'] as num).toInt(),
+          ))
+      .toList();
+  return ProgressTrainingStats(weeklyVolume: weeks, muscleGroups: groups);
+});

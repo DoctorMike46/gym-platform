@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 
 interface FinishBody {
     total_duration_seconds?: number;
+    note?: string | null;
 }
 
 export async function POST(
@@ -36,7 +37,8 @@ export async function POST(
         const result = await finishClientWorkoutSession(
             auth.session,
             workoutLogId,
-            body.total_duration_seconds
+            body.total_duration_seconds,
+            { note: body.note ?? null }
         );
         return jsonOk(result);
     } catch {

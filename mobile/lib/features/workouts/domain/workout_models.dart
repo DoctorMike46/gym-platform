@@ -297,6 +297,47 @@ class WorkoutLogDetail {
   }
 }
 
+/// Snapshot dell'ultimo log "completed" di un esercizio: usato per
+/// pre-populate il session player con i dati della sessione precedente.
+class LastExerciseLog {
+  const LastExerciseLog({
+    required this.dateExecuted,
+    required this.setsCompleted,
+    required this.repsActual,
+    required this.weightActual,
+    required this.rpeActual,
+    this.note,
+  });
+
+  final DateTime dateExecuted;
+  final int setsCompleted;
+  final List<num> repsActual;
+  final List<num> weightActual;
+  final List<num?> rpeActual;
+  final String? note;
+
+  factory LastExerciseLog.fromJson(Map<String, dynamic> json) {
+    List<num> parseNumList(dynamic v) {
+      if (v is! List) return const [];
+      return v.whereType<num>().toList();
+    }
+
+    List<num?> parseNullableNumList(dynamic v) {
+      if (v is! List) return const [];
+      return v.map((e) => e is num ? e : null).toList();
+    }
+
+    return LastExerciseLog(
+      dateExecuted: DateTime.parse(json['date_executed'] as String),
+      setsCompleted: (json['sets_completed'] as num?)?.toInt() ?? 0,
+      repsActual: parseNumList(json['reps_actual']),
+      weightActual: parseNumList(json['weight_actual']),
+      rpeActual: parseNullableNumList(json['rpe_actual']),
+      note: json['note'] as String?,
+    );
+  }
+}
+
 /// Workout log (sessione di allenamento eseguita o in corso).
 class WorkoutLog {
   const WorkoutLog({
@@ -310,6 +351,7 @@ class WorkoutLog {
     this.totalDurationSeconds,
     this.note,
     this.trainerNote,
+    this.createdAt,
   });
 
   final int id;
@@ -322,6 +364,7 @@ class WorkoutLog {
   final int? totalDurationSeconds;
   final String? note;
   final String? trainerNote;
+  final DateTime? createdAt;
 
   bool get isCompleted => status == 'completed';
   bool get isInProgress => status == 'in_progress';
@@ -340,6 +383,9 @@ class WorkoutLog {
           json['total_duration_seconds'] is num ? (json['total_duration_seconds'] as num).toInt() : null,
       note: json['note'] as String?,
       trainerNote: json['trainer_note'] as String?,
+      createdAt: json['created_at'] is String
+          ? DateTime.tryParse(json['created_at'] as String)
+          : null,
     );
   }
 }

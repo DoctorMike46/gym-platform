@@ -97,7 +97,7 @@ class _SessionContent extends ConsumerWidget {
     final completed = state.exercisesCompleted;
     final total = state.exercisesOfDay.length;
 
-    final shouldFinish = await showModalBottomSheet<bool>(
+    final note = await showModalBottomSheet<String?>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -110,12 +110,11 @@ class _SessionContent extends ConsumerWidget {
         elapsed: state.elapsed,
       ),
     );
-    if (shouldFinish != true || !context.mounted) return;
+    if (note == null || !context.mounted) return;
 
-    final result = await notifier.finish();
+    final result = await notifier.finish(note: note.isEmpty ? null : note);
     if (!context.mounted) return;
     if (result.ok) {
-      // Mostra animazione celebration prima del pop
       await showDialog<void>(
         context: context,
         barrierDismissible: false,
@@ -123,10 +122,18 @@ class _SessionContent extends ConsumerWidget {
         builder: (_) => const _CelebrationDialog(),
       );
       if (!context.mounted) return;
-      // Forza ricarica di lista schede + storia allenamenti dopo finish
       ref.invalidate(assignmentsListProvider);
       ref.invalidate(assignmentHistoryProvider(assignmentId));
       Navigator.of(context).pop();
+      if (result.offline) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Salvato offline. Sync automatico al rientro online.',
+            ),
+          ),
+        );
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(result.error ?? 'Errore')),
@@ -237,6 +244,9 @@ class _SessionContent extends ConsumerWidget {
                   exerciseRow: ex,
                   editState: exState,
                   saving: state.savingFlags[tplEx.id] ?? false,
+                  lastLog: state.lastLogs[tplEx.id],
+                  isPrCelebrating:
+                      state.recentPrTemplateExerciseId == tplEx.id,
                   onUpdate: (idx, {reps, weight, rpe, completed}) {
                     notifier.updateSet(
                       tplEx.id,
@@ -270,6 +280,8 @@ class _ExerciseSessionCard extends StatelessWidget {
     required this.exerciseRow,
     required this.editState,
     required this.saving,
+    required this.lastLog,
+    required this.isPrCelebrating,
     required this.onUpdate,
     required this.onAddSet,
     required this.onRemoveSet,
@@ -279,6 +291,8 @@ class _ExerciseSessionCard extends StatelessWidget {
   final TemplateExerciseWithExercise exerciseRow;
   final ExerciseEditState editState;
   final bool saving;
+  final LastExerciseLog? lastLog;
+  final bool isPrCelebrating;
   final void Function(int setIdx, {int? reps, double? weight, int? rpe, bool? completed}) onUpdate;
   final VoidCallback onAddSet;
   final void Function(int setIdx) onRemoveSet;
@@ -295,16 +309,19 @@ class _ExerciseSessionCard extends StatelessWidget {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: editState.isComplete
-              ? theme.colorScheme.primary.withValues(alpha: 0.4)
-              : theme.colorScheme.outline,
-          width: editState.isComplete ? 1.5 : 1,
+          color: isPrCelebrating
+              ? AppColors.brandAccent
+              : editState.isComplete
+                  ? theme.colorScheme.primary.withValues(alpha: 0.4)
+                  : theme.colorScheme.outline,
+          width: isPrCelebrating || editState.isComplete ? 1.5 : 1,
         ),
       ),
       padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (isPrCelebrating) const _PrBanner(),
           // Header
           Row(
             children: [
@@ -405,6 +422,10 @@ class _ExerciseSessionCard extends StatelessWidget {
               ),
             ),
           ],
+          if (lastLog != null && lastLog!.repsActual.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _LastLogBadge(log: lastLog!),
+          ],
           const SizedBox(height: 14),
 
           // Set rows
@@ -426,6 +447,139 @@ class _ExerciseSessionCard extends StatelessWidget {
               onPressed: onAddSet,
               icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
               label: const Text('Aggiungi serie'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrBanner extends StatelessWidget {
+  const _PrBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppColors.brandAccent,
+            Color.lerp(AppColors.brandAccent, Colors.amber, 0.3)!,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.emoji_events_rounded,
+            color: AppColors.white,
+            size: 18,
+          )
+              .animate(onPlay: (c) => c.repeat())
+              .shake(hz: 4, duration: 600.ms)
+              .then(delay: 600.ms),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'NUOVO PERSONAL RECORD!',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: AppColors.white,
+                letterSpacing: 0.6,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ).animate().scale(
+          begin: const Offset(0.8, 0.8),
+          end: const Offset(1, 1),
+          duration: 300.ms,
+          curve: Curves.elasticOut,
+        );
+  }
+}
+
+class _LastLogBadge extends StatelessWidget {
+  const _LastLogBadge({required this.log});
+  final LastExerciseLog log;
+
+  String _summary() {
+    // Esempio: "8x80 · 8x80 · 7x80kg" se i pesi variano molto, altrimenti "8/8/7 reps @ 80kg"
+    if (log.repsActual.isEmpty) return '';
+    final reps = log.repsActual.map((r) => r.toInt()).toList();
+    final weights = log.weightActual.map((w) => w.toDouble()).toList();
+    final allSameWeight =
+        weights.isNotEmpty && weights.toSet().length == 1 && weights.first > 0;
+    if (allSameWeight) {
+      final w = weights.first;
+      final wStr = w == w.truncateToDouble() ? w.toInt().toString() : w.toString();
+      return '${reps.join("/")} reps @ ${wStr}kg';
+    }
+    final parts = <String>[];
+    for (var i = 0; i < reps.length; i++) {
+      final w = i < weights.length ? weights[i] : 0;
+      final wStr = w == w.truncateToDouble() ? w.toInt().toString() : w.toStringAsFixed(1);
+      parts.add('${reps[i]}×$wStr');
+    }
+    return parts.join(' · ');
+  }
+
+  String _daysAgo() {
+    final diff = DateTime.now().difference(log.dateExecuted).inDays;
+    if (diff <= 0) return 'oggi';
+    if (diff == 1) return 'ieri';
+    if (diff < 7) return '$diff giorni fa';
+    if (diff < 30) return '${(diff / 7).floor()} sett fa';
+    return formatDateItShort(log.dateExecuted);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.brandAccent.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(
+          color: AppColors.brandAccent.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.history_rounded,
+            size: 14,
+            color: AppColors.brandAccent,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text.rich(
+              TextSpan(
+                children: [
+                  TextSpan(
+                    text: 'Ultima volta · ${_daysAgo()}: ',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  TextSpan(
+                    text: _summary(),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.onSurface,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
@@ -847,7 +1001,7 @@ class _FinishBottomBar extends StatelessWidget {
   }
 }
 
-class _FinishSheet extends StatelessWidget {
+class _FinishSheet extends StatefulWidget {
   const _FinishSheet({
     required this.completed,
     required this.total,
@@ -859,46 +1013,77 @@ class _FinishSheet extends StatelessWidget {
   final Duration elapsed;
 
   @override
+  State<_FinishSheet> createState() => _FinishSheetState();
+}
+
+class _FinishSheetState extends State<_FinishSheet> {
+  final _noteCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final inset = MediaQuery.of(context).viewInsets.bottom;
     return SafeArea(
       child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: theme.dividerColor,
-                  borderRadius: BorderRadius.circular(2),
+        padding: EdgeInsets.only(bottom: inset),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.dividerColor,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text('Riepilogo allenamento', style: theme.textTheme.headlineSmall),
-            const SizedBox(height: 16),
-            _SummaryRow(label: 'Durata', value: formatDuration(elapsed)),
-            const SizedBox(height: 8),
-            _SummaryRow(label: 'Esercizi completati', value: '$completed di $total'),
-            const SizedBox(height: 24),
-            FilledButton.icon(
-              onPressed: () => Navigator.pop(context, true),
-              icon: const Icon(Icons.flag_rounded),
-              label: const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Text('Conferma e finisci'),
+              const SizedBox(height: 16),
+              Text('Riepilogo allenamento', style: theme.textTheme.headlineSmall),
+              const SizedBox(height: 16),
+              _SummaryRow(label: 'Durata', value: formatDuration(widget.elapsed)),
+              const SizedBox(height: 8),
+              _SummaryRow(
+                label: 'Esercizi completati',
+                value: '${widget.completed} di ${widget.total}',
               ),
-            ),
-            const SizedBox(height: 8),
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Continua allenamento'),
-            ),
-          ],
+              const SizedBox(height: 16),
+              TextField(
+                controller: _noteCtrl,
+                maxLines: 3,
+                maxLength: 500,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Note (facoltative)',
+                  hintText: 'Come ti sei sentito? Il trainer le vedrà.',
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton.icon(
+                onPressed: () => Navigator.pop(context, _noteCtrl.text.trim()),
+                icon: const Icon(Icons.flag_rounded),
+                label: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text('Conferma e finisci'),
+                ),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => Navigator.pop(context, null),
+                child: const Text('Continua allenamento'),
+              ),
+            ],
+          ),
         ),
       ),
     );

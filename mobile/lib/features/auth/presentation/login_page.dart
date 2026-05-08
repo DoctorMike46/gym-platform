@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../core/storage/secure_storage.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/widgets/primary_button.dart';
 import 'auth_controller.dart';
+import 'forgot_password_page.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
   const LoginPage({super.key});
@@ -44,6 +47,13 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           SnackBar(content: Text(error)),
         );
       }
+      return;
+    }
+    // Login OK: se è il primo accesso, mostra l'onboarding tour
+    final done = await ref.read(secureStorageProvider).isOnboardingDone();
+    if (!mounted) return;
+    if (!done) {
+      context.go('/onboarding-tour');
     }
   }
 
@@ -162,14 +172,11 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       .slideY(begin: 0.15),
                   const SizedBox(height: 24),
                   TextButton(
-                    onPressed: () {
-                      // TODO: implementare flusso reset password
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Reset password — disponibile a breve'),
-                        ),
-                      );
-                    },
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const ForgotPasswordPage(),
+                      ),
+                    ),
                     child: const Text('Password dimenticata?'),
                   ),
                 ],

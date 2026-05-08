@@ -63,8 +63,31 @@ class WorkoutsRepository {
   Future<void> finishSession({
     required int logId,
     required int totalDurationSeconds,
+    String? note,
   }) {
-    return _api.finishSession(logId: logId, totalDurationSeconds: totalDurationSeconds);
+    return _api.finishSession(
+      logId: logId,
+      totalDurationSeconds: totalDurationSeconds,
+      note: note,
+    );
+  }
+
+  /// Restituisce l'ultimo log per ogni template_exercise_id richiesto (null se assente).
+  Future<Map<int, LastExerciseLog?>> getLastExerciseLogsBulk(
+      List<int> templateExerciseIds) async {
+    if (templateExerciseIds.isEmpty) return {};
+    final raw = await _api.getLastExerciseLogsBulk(templateExerciseIds);
+    final out = <int, LastExerciseLog?>{};
+    raw.forEach((key, value) {
+      final id = int.tryParse(key);
+      if (id == null) return;
+      if (value is Map<String, dynamic>) {
+        out[id] = LastExerciseLog.fromJson(value);
+      } else {
+        out[id] = null;
+      }
+    });
+    return out;
   }
 }
 

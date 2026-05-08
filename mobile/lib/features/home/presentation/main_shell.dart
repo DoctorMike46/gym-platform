@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/sync/sync_indicator.dart';
+
 class MainShell extends StatelessWidget {
   const MainShell({super.key, required this.child});
   final Widget child;
@@ -46,16 +48,22 @@ class MainShell extends StatelessWidget {
 
     return Scaffold(
       body: child,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selected,
-        onDestinationSelected: (i) => context.go(_tabs[i].route),
-        destinations: [
-          for (final t in _tabs)
-            NavigationDestination(
-              icon: Icon(t.icon),
-              selectedIcon: Icon(t.activeIcon),
-              label: t.label,
-            ),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SyncIndicator(),
+          NavigationBar(
+            selectedIndex: selected,
+            onDestinationSelected: (i) => context.go(_tabs[i].route),
+            destinations: [
+              for (final t in _tabs)
+                NavigationDestination(
+                  icon: Icon(t.icon),
+                  selectedIcon: Icon(t.activeIcon),
+                  label: t.label,
+                ),
+            ],
+          ),
         ],
       ),
     );

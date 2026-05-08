@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
+import '../../../core/widgets/skeleton.dart';
 import '../../../shared/utils/date_format_it.dart';
 import '../data/documents_repository.dart';
 
@@ -25,13 +26,7 @@ class DocumentsPage extends ConsumerWidget {
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(documentsListProvider),
         child: asyncList.when(
-          loading: () => ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: const [
-              SizedBox(height: 100),
-              Center(child: CircularProgressIndicator()),
-            ],
-          ),
+          loading: () => const SkeletonList(itemCount: 5, itemHeight: 84),
           error: (e, _) => ListView(
             physics: const AlwaysScrollableScrollPhysics(),
             children: [

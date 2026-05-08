@@ -127,6 +127,18 @@ class AuthController extends StateNotifier<AuthState> {
     state = const AuthState(status: AuthStatus.unauthenticated);
   }
 
+  /// Aggiorna i dati profilo lato backend e ricarica /me.
+  Future<bool> updateProfile({String? telefono}) async {
+    try {
+      await _repository.updateProfile(telefono: telefono);
+      final me = await _repository.fetchMe();
+      state = state.copyWith(profile: me.profile, branding: me.branding);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Forza un logout locale senza chiamare l'API (es. quando il refresh token
   /// è scaduto o invalidato dal backend). Lo storage è già stato pulito dal
   /// chiamante.

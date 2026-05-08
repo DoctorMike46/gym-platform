@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { body_measurements, progress_photos } from "@/db/schema";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import {
     deleteFromR2,
     generateProgressPhotoKey,
@@ -146,6 +146,101 @@ export async function getClientProgressPhotoSignedUrl(
         .limit(1);
     if (!photo) throw new Error("Foto non trovata");
     return getR2SignedUrl(photo.r2_key);
+}
+
+export interface WeeklyVolumeBucket {
+    week_start: string; // YYYY-MM-DD (lunedì)
+    volume: number;
+}
+
+export interface MuscleGroupBucket {
+    gruppo: string;
+    count: number; // numero di esercizi loggati nel periodo
+}
+
+export interface ProgressStats {
+    weekly_volume: WeeklyVolumeBucket[]; // ultime 8 settimane
+    muscle_groups: MuscleGroupBucket[]; // ultimi 30 giorni
+}
+
+export async function getClientProgressStats(
+    session: ClientSession
+): Promise<ProgressStats> {
+    // Volume settimanale ultime 8 settimane
+    const volumeRows = await db.execute<{ week_start: string; volume: string }>(
+        sql`
+        WITH weeks AS (
+          SELECT generate_series(
+            date_trunc('week', CURRENT_DATE - interval '7 weeks'),
+            date_trunc('week', CURRENT_DATE),
+            '1 week'::interval
+          )::date AS week_start
+        )
+        SELECT
+          to_char(w.week_start, 'YYYY-MM-DD') AS week_start,
+          COALESCE(
+            (
+              SELECT SUM(rep::numeric * weight::numeric)
+              FROM workout_logs wl
+              JOIN workout_exercise_logs wel ON wel.workout_log_id = wl.id
+              CROSS JOIN LATERAL UNNEST(
+                ARRAY(SELECT jsonb_array_elements(wel.reps_actual)::text::numeric),
+                ARRAY(SELECT jsonb_array_elements(wel.weight_actual)::text::numeric)
+              ) AS t(rep, weight)
+              WHERE wl.client_id = ${session.id}
+                AND wl.status = 'completed'
+                AND wl.date_executed >= w.week_start
+                AND wl.date_executed < w.week_start + interval '1 week'
+            ),
+            0
+          ) AS volume
+        FROM weeks w
+        ORDER BY w.week_start
+        `
+    );
+
+    const weekly_volume: WeeklyVolumeBucket[] = (
+        (volumeRows as { rows?: Array<{ week_start: string; volume: string }> }).rows ??
+        (volumeRows as unknown as Array<{ week_start: string; volume: string }>) ??
+        []
+    ).map((r) => ({
+        week_start: r.week_start,
+        volume: Math.round(parseFloat(r.volume ?? "0")),
+    }));
+
+    // Gruppi muscolari ultimi 30 giorni (count esercizi loggati)
+    const thirtyAgo = new Date();
+    thirtyAgo.setDate(thirtyAgo.getDate() - 30);
+    const thirtyAgoStr = thirtyAgo.toISOString().slice(0, 10);
+
+    const muscleRows = await db.execute<{ gruppo: string; cnt: string }>(
+        sql`
+        SELECT
+          COALESCE(e.gruppo_muscolare, 'Altro') AS gruppo,
+          COUNT(*)::text AS cnt
+        FROM workout_logs wl
+        JOIN workout_exercise_logs wel ON wel.workout_log_id = wl.id
+        JOIN workout_template_exercises te ON te.id = wel.template_exercise_id
+        JOIN exercises e ON e.id = te.exercise_id
+        WHERE wl.client_id = ${session.id}
+          AND wl.status = 'completed'
+          AND wl.date_executed >= ${thirtyAgoStr}::date
+        GROUP BY e.gruppo_muscolare
+        ORDER BY COUNT(*) DESC
+        LIMIT 8
+        `
+    );
+
+    const muscle_groups: MuscleGroupBucket[] = (
+        (muscleRows as { rows?: Array<{ gruppo: string; cnt: string }> }).rows ??
+        (muscleRows as unknown as Array<{ gruppo: string; cnt: string }>) ??
+        []
+    ).map((r) => ({
+        gruppo: r.gruppo || "Altro",
+        count: parseInt(r.cnt ?? "0", 10),
+    }));
+
+    return { weekly_volume, muscle_groups };
 }
 
 export async function deleteClientProgressPhoto(

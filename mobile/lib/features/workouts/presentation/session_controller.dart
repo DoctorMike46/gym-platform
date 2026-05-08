@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/sync/sync_worker.dart';
 import '../data/workouts_repository.dart';
 import '../domain/workout_models.dart';
 
@@ -59,6 +60,17 @@ class ExerciseEditState {
   int get setsCompleted => sets.where((s) => s.completed).length;
   bool get isComplete => sets.isNotEmpty && sets.every((s) => s.completed);
 
+  /// Peso massimo registrato in questa sessione (per il check PR).
+  double get maxWeight {
+    var max = 0.0;
+    for (final s in sets) {
+      if (s.completed && s.weight != null && s.weight! > max) {
+        max = s.weight!;
+      }
+    }
+    return max;
+  }
+
   ExerciseEditState copyWithSets(List<SetEntry> sets) =>
       ExerciseEditState(
         templateExerciseId: templateExerciseId,
@@ -109,9 +121,15 @@ class SessionState {
     required this.editStates,
     required this.savingFlags,
     required this.elapsed,
+    required this.lastLogs,
+    this.recentPrTemplateExerciseId,
     this.restTimer,
     this.finishing = false,
   });
+
+  /// Se != null, l'esercizio con questo id ha appena registrato un PR
+  /// (peso > max della sessione precedente). Usato per mostrare l'animazione.
+  final int? recentPrTemplateExerciseId;
 
   final WorkoutLog log;
   final WorkoutTemplate? template;
@@ -122,6 +140,9 @@ class SessionState {
 
   /// Map: templateExerciseId → true se autosave in corso
   final Map<int, bool> savingFlags;
+
+  /// Map: templateExerciseId → ultimo log "completed" del cliente (per "ultima volta…")
+  final Map<int, LastExerciseLog?> lastLogs;
 
   /// Tempo trascorso dall'apertura della sessione (live).
   final Duration elapsed;
@@ -137,10 +158,13 @@ class SessionState {
   SessionState copyWith({
     Map<int, ExerciseEditState>? editStates,
     Map<int, bool>? savingFlags,
+    Map<int, LastExerciseLog?>? lastLogs,
     Duration? elapsed,
     bool? finishing,
     RestTimerState? restTimer,
+    int? recentPrTemplateExerciseId,
     bool clearRestTimer = false,
+    bool clearPr = false,
   }) {
     return SessionState(
       log: log,
@@ -148,26 +172,54 @@ class SessionState {
       exercisesOfDay: exercisesOfDay,
       editStates: editStates ?? this.editStates,
       savingFlags: savingFlags ?? this.savingFlags,
+      lastLogs: lastLogs ?? this.lastLogs,
       elapsed: elapsed ?? this.elapsed,
       restTimer: clearRestTimer ? null : (restTimer ?? this.restTimer),
+      recentPrTemplateExerciseId: clearPr
+          ? null
+          : (recentPrTemplateExerciseId ?? this.recentPrTemplateExerciseId),
       finishing: finishing ?? this.finishing,
     );
+  }
+
+  /// Restituisce true se l'esercizio ha un nuovo PR vs ultima sessione
+  /// (max weight in sessione corrente > max weight ultimo log).
+  bool isPersonalRecord(int templateExerciseId) {
+    final ex = editStates[templateExerciseId];
+    if (ex == null) return false;
+    final cur = ex.maxWeight;
+    if (cur <= 0) return false;
+    final last = lastLogs[templateExerciseId];
+    if (last == null || last.weightActual.isEmpty) return false;
+    final prev = last.weightActual
+        .map((w) => w.toDouble())
+        .fold<double>(0, (a, b) => b > a ? b : a);
+    return cur > prev;
   }
 }
 
 class SessionController extends StateNotifier<AsyncValue<SessionState>> {
-  SessionController(this._repo, this._logId) : super(const AsyncValue.loading()) {
+  SessionController(this._repo, this._sync, this._logId)
+      : super(const AsyncValue.loading()) {
     _initialize();
   }
 
   final WorkoutsRepository _repo;
+  final SyncWorker _sync;
   final int _logId;
 
   final Map<int, Timer> _autosaveTimers = {};
-  Stopwatch? _stopwatch;
+  DateTime? _sessionStartedAt;
   Timer? _ticker;
   Timer? _restTicker;
   bool _disposed = false;
+
+  Duration get _currentElapsed {
+    final start = _sessionStartedAt;
+    if (start == null) return Duration.zero;
+    final diff = DateTime.now().difference(start);
+    return diff.isNegative ? Duration.zero : diff;
+  }
 
   static const _autosaveDelay = Duration(milliseconds: 800);
 
@@ -188,6 +240,15 @@ class SessionController extends StateNotifier<AsyncValue<SessionState>> {
           (a, b) => a.templateExercise.ordine.compareTo(b.templateExercise.ordine),
         );
 
+      // Fetch parallelo dei "last logs" per pre-popolare i campi
+      final teIds = exercisesOfDay.map((e) => e.templateExercise.id).toList();
+      Map<int, LastExerciseLog?> lastLogs = const {};
+      try {
+        lastLogs = await _repo.getLastExerciseLogsBulk(teIds);
+      } catch (e) {
+        debugPrint('[session] last logs fetch failed: $e');
+      }
+
       final editStates = <int, ExerciseEditState>{};
       for (final e in exercisesOfDay) {
         final tplEx = e.templateExercise;
@@ -198,22 +259,24 @@ class SessionController extends StateNotifier<AsyncValue<SessionState>> {
             .toList();
 
         if (existing.isNotEmpty) {
+          // Riapertura sessione: usa i valori già salvati
           editStates[tplEx.id] = _hydrate(tplEx, existing.first.exerciseLog);
         } else {
-          editStates[tplEx.id] = ExerciseEditState(
-            templateExerciseId: tplEx.id,
-            ordine: tplEx.ordine,
-            sets: List.generate(targetSets, (_) => const SetEntry()),
-          );
+          // Nuova sessione: pre-popola con i valori dell'ultima sessione (se presenti)
+          final last = lastLogs[tplEx.id];
+          editStates[tplEx.id] = _prepopulate(tplEx, targetSets, last);
         }
       }
 
-      _stopwatch = Stopwatch()..start();
+      // Anchor del stopwatch: created_at della session (server-side).
+      // Se la sessione è stata aperta in passato (app killata e riaperta),
+      // riprende da dove era. Se non c'è (offline o errore parsing), usa now.
+      _sessionStartedAt = session.log.createdAt ?? DateTime.now();
       _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
         if (_disposed) return;
         final cur = state;
         if (cur is AsyncData<SessionState>) {
-          state = AsyncData(cur.value.copyWith(elapsed: _stopwatch!.elapsed));
+          state = AsyncData(cur.value.copyWith(elapsed: _currentElapsed));
         }
       });
 
@@ -224,12 +287,51 @@ class SessionController extends StateNotifier<AsyncValue<SessionState>> {
           exercisesOfDay: exercisesOfDay,
           editStates: editStates,
           savingFlags: const {},
-          elapsed: Duration.zero,
+          lastLogs: lastLogs,
+          elapsed: _currentElapsed,
         ),
       );
     } catch (e, st) {
       state = AsyncError(e, st);
     }
+  }
+
+  /// Crea sets vuoti pre-popolati con reps/weight/rpe dell'ultima sessione,
+  /// ma `completed=false` (l'utente deve confermare).
+  static ExerciseEditState _prepopulate(
+    WorkoutTemplateExercise tpl,
+    int targetSets,
+    LastExerciseLog? last,
+  ) {
+    if (last == null || last.repsActual.isEmpty) {
+      return ExerciseEditState(
+        templateExerciseId: tpl.id,
+        ordine: tpl.ordine,
+        sets: List.generate(targetSets, (_) => const SetEntry()),
+      );
+    }
+    final n = targetSets > 0 ? targetSets : last.repsActual.length;
+    final sets = <SetEntry>[];
+    for (var i = 0; i < n; i++) {
+      sets.add(
+        SetEntry(
+          reps: i < last.repsActual.length ? last.repsActual[i].toInt() : null,
+          weight: i < last.weightActual.length
+              ? last.weightActual[i].toDouble()
+              : null,
+          rpe: i < last.rpeActual.length && last.rpeActual[i] != null
+              ? (last.rpeActual[i] as num).toInt()
+              : null,
+          // I valori sono pre-suggeriti, l'utente li conferma con il check.
+          completed: false,
+        ),
+      );
+    }
+    return ExerciseEditState(
+      templateExerciseId: tpl.id,
+      ordine: tpl.ordine,
+      sets: sets,
+    );
   }
 
   static int _parseTargetSets(String? serie) {
@@ -313,10 +415,29 @@ class SessionController extends StateNotifier<AsyncValue<SessionState>> {
     state = AsyncData(s.copyWith(editStates: newStates));
     _scheduleAutosave(templateExerciseId);
 
-    // Se ho appena marcato un set come completato → avvia rest timer
+    // Se ho appena marcato un set come completato → avvia rest timer + check PR
     if (completed == true && !wasCompleted) {
       _startRestTimerForExercise(templateExerciseId);
+      _checkPersonalRecord(templateExerciseId);
     }
+  }
+
+  void _checkPersonalRecord(int templateExerciseId) {
+    final cur = state;
+    if (cur is! AsyncData<SessionState>) return;
+    final s = cur.value;
+    if (!s.isPersonalRecord(templateExerciseId)) return;
+    HapticFeedback.heavyImpact();
+    state = AsyncData(s.copyWith(recentPrTemplateExerciseId: templateExerciseId));
+    // Reset il flag dopo 4 secondi
+    Future.delayed(const Duration(seconds: 4), () {
+      if (_disposed) return;
+      final c = state;
+      if (c is AsyncData<SessionState> &&
+          c.value.recentPrTemplateExerciseId == templateExerciseId) {
+        state = AsyncData(c.value.copyWith(clearPr: true));
+      }
+    });
   }
 
   void addSet(int templateExerciseId) {
@@ -397,9 +518,24 @@ class SessionController extends StateNotifier<AsyncValue<SessionState>> {
         rpeActual: rpes,
         note: exState.note,
       );
+      // Successo: rimuovi eventuale mutation pending precedente
+      await _sync.store
+          .remove('save_exercise_log:$_logId:$templateExerciseId');
     } catch (e) {
-      debugPrint('[session] autosave failed: $e');
-      // Best-effort: il timer ritenterà al prossimo update.
+      // Errore (offline o altro) → enqueue per replay automatico
+      debugPrint('[session] save failed, enqueuing: $e');
+      await _sync.enqueue(
+        SyncWorker.buildSaveExerciseLog(
+          logId: _logId,
+          templateExerciseId: templateExerciseId,
+          ordine: exState.ordine,
+          setsCompleted: exState.setsCompleted,
+          repsActual: reps,
+          weightActual: weights,
+          rpeActual: rpes,
+          note: exState.note,
+        ),
+      );
     }
 
     if (_disposed) return;
@@ -534,24 +670,46 @@ class SessionController extends StateNotifier<AsyncValue<SessionState>> {
 
   // ─── finish ──────────────────────────────────────────────
 
-  Future<({bool ok, String? error})> finish() async {
+  Future<({bool ok, String? error, bool offline})> finish({String? note}) async {
     final current = state;
     if (current is! AsyncData<SessionState>) {
-      return (ok: false, error: 'Stato non pronto');
+      return (ok: false, error: 'Stato non pronto', offline: false);
     }
     state = AsyncData(current.value.copyWith(finishing: true));
+    final seconds = _currentElapsed.inSeconds;
     try {
       await flushPending();
-      final seconds = _stopwatch?.elapsed.inSeconds ?? 0;
-      await _repo.finishSession(logId: _logId, totalDurationSeconds: seconds);
-      return (ok: true, error: null);
+      await _repo.finishSession(
+        logId: _logId,
+        totalDurationSeconds: seconds,
+        note: note,
+      );
+      return (ok: true, error: null, offline: false);
     } catch (e) {
-      if (_disposed) return (ok: false, error: 'Sessione chiusa');
+      // Errore di rete → enqueue per sync automatico
+      if (isDioNetworkError(e)) {
+        debugPrint('[session] finish offline, enqueuing');
+        await _sync.enqueue(
+          SyncWorker.buildFinishSession(
+            logId: _logId,
+            totalDurationSeconds: seconds,
+            note: note,
+          ),
+        );
+        return (ok: true, error: null, offline: true);
+      }
+      if (_disposed) {
+        return (ok: false, error: 'Sessione chiusa', offline: false);
+      }
       final cur = state;
       if (cur is AsyncData<SessionState>) {
         state = AsyncData(cur.value.copyWith(finishing: false));
       }
-      return (ok: false, error: e is ApiException ? e.message : 'Errore conclusione');
+      return (
+        ok: false,
+        error: e is ApiException ? e.message : 'Errore conclusione',
+        offline: false,
+      );
     }
   }
 
@@ -560,7 +718,6 @@ class SessionController extends StateNotifier<AsyncValue<SessionState>> {
     _disposed = true;
     _ticker?.cancel();
     _restTicker?.cancel();
-    _stopwatch?.stop();
     for (final t in _autosaveTimers.values) {
       t.cancel();
     }
@@ -572,5 +729,6 @@ class SessionController extends StateNotifier<AsyncValue<SessionState>> {
 final sessionControllerProvider = StateNotifierProvider.autoDispose
     .family<SessionController, AsyncValue<SessionState>, int>((ref, logId) {
   final repo = ref.watch(workoutsRepositoryProvider);
-  return SessionController(repo, logId);
+  final sync = ref.watch(syncWorkerProvider);
+  return SessionController(repo, sync, logId);
 });
