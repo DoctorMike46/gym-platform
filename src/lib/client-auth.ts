@@ -70,7 +70,11 @@ export async function getAuthenticatedClient(): Promise<ClientSession> {
                 .limit(1);
 
             if (!client || !client.is_active) throw new Error("Account disattivato");
-            if (client.password_changed_at && iat * 1000 < client.password_changed_at.getTime()) {
+            // Tolleranza 1s: iat è in secondi (floor), password_changed_at in ms
+            if (
+                client.password_changed_at &&
+                iat * 1000 + 1000 < client.password_changed_at.getTime()
+            ) {
                 throw new Error("Sessione invalidata");
             }
         }

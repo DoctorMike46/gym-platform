@@ -49,6 +49,23 @@ export async function getR2SignedUrl(key: string): Promise<string> {
 }
 
 /**
+ * Genera un URL firmato per upload diretto (PUT) — usato dal mobile per
+ * caricare foto progressi direttamente su R2 senza passare per Next.
+ */
+export async function getR2SignedUploadUrl(params: {
+    key: string;
+    contentType: string;
+    expiresIn?: number;
+}): Promise<string> {
+    const command = new PutObjectCommand({
+        Bucket: R2_BUCKET_NAME,
+        Key: params.key,
+        ContentType: params.contentType,
+    });
+    return getSignedUrl(s3Client, command, { expiresIn: params.expiresIn ?? 600 });
+}
+
+/**
  * Elimina un file da Cloudflare R2
  */
 export async function deleteFromR2(key: string): Promise<void> {

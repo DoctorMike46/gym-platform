@@ -247,6 +247,45 @@ export const client_password_reset_tokens = pgTable("client_password_reset_token
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ─── Client Refresh Tokens (mobile app) ────────────────
+export const client_refresh_tokens = pgTable(
+  "client_refresh_tokens",
+  {
+    id: serial("id").primaryKey(),
+    client_id: integer("client_id").references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    token_hash: text("token_hash").notNull(),
+    device_id: text("device_id"),
+    user_agent: text("user_agent"),
+    expires_at: timestamp("expires_at").notNull(),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    last_used_at: timestamp("last_used_at"),
+    revoked_at: timestamp("revoked_at"),
+  },
+  (t) => ({
+    tokenHashIdx: uniqueIndex("client_refresh_tokens_hash_idx").on(t.token_hash),
+    clientIdx: index("client_refresh_tokens_client_idx").on(t.client_id),
+  })
+);
+
+// ─── Client Devices (FCM push tokens) ──────────────────
+export const client_devices = pgTable(
+  "client_devices",
+  {
+    id: serial("id").primaryKey(),
+    client_id: integer("client_id").references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    fcm_token: text("fcm_token").notNull(),
+    platform: text("platform").notNull(), // 'ios' | 'android'
+    device_id: text("device_id"),
+    app_version: text("app_version"),
+    last_seen_at: timestamp("last_seen_at").defaultNow().notNull(),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    fcmTokenIdx: uniqueIndex("client_devices_fcm_token_idx").on(t.fcm_token),
+    clientIdx: index("client_devices_client_idx").on(t.client_id),
+  })
+);
+
 // ═══════════════════════════════════════════════════════════
 // Relations
 // ═══════════════════════════════════════════════════════════

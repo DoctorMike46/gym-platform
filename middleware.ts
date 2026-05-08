@@ -35,6 +35,11 @@ const CLIENT_PUBLIC_PATHS = [
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
+    // Mobile REST API: gestisce auth/errori in JSON puro per-route
+    if (pathname.startsWith("/api/v1")) {
+        return NextResponse.next();
+    }
+
     // Static / framework
     if (
         pathname.startsWith("/_next") ||
