@@ -120,3 +120,35 @@ export function generateProgressPhotoKey(clientId: number, type: string, fileNam
     const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
     return `clients/${clientId}/progress/${timestamp}_${type}_${sanitized}`;
 }
+
+/**
+ * Genera una chiave R2 per un allegato di una risposta a questionario.
+ * Path: clients/<clientId>/questionnaires/<assignmentId>/<questionId>_<ts>_<filename>
+ */
+export function generateQuestionnaireAnswerKey(
+    clientId: number,
+    assignmentId: number,
+    questionId: string,
+    fileName: string
+): string {
+    const timestamp = Date.now();
+    const safeQ = questionId.replace(/[^a-zA-Z0-9_-]/g, "_");
+    const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    return `clients/${clientId}/questionnaires/${assignmentId}/${safeQ}_${timestamp}_${sanitized}`;
+}
+
+/**
+ * Genera una chiave R2 per un allegato (foto/video) di un esercizio log.
+ * Path: clients/<clientId>/workouts/<exerciseLogId>/<ts>_<filename>
+ * Permette di derivare clientId e exerciseLogId solo dalla key, utile per
+ * ownership-check senza fare join.
+ */
+export function generateWorkoutAttachmentKey(
+    clientId: number,
+    exerciseLogId: number,
+    fileName: string
+): string {
+    const timestamp = Date.now();
+    const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    return `clients/${clientId}/workouts/${exerciseLogId}/${timestamp}_${sanitized}`;
+}

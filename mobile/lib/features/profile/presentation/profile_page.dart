@@ -135,23 +135,17 @@ class ProfilePage extends ConsumerWidget {
           ),
 
           const SizedBox(height: 16),
-          _SectionTitle(title: 'Aspetto'),
-          _ThemeToggleTile(currentMode: themeMode),
+          _SectionTitle(title: 'Privacy e dati'),
+          _SettingTile(
+            icon: Icons.shield_outlined,
+            title: 'Privacy e dati',
+            subtitle: 'Consensi, export dati, elimina account',
+            onTap: () => context.push('/privacy'),
+          ),
 
           const SizedBox(height: 16),
-          _SectionTitle(title: 'Contenuti'),
-          _SettingTile(
-            icon: Icons.folder_outlined,
-            title: 'Documenti',
-            subtitle: 'Schede, certificati, consensi',
-            onTap: () => context.push('/documents'),
-          ),
-          _SettingTile(
-            icon: Icons.campaign_outlined,
-            title: 'Annunci',
-            subtitle: 'Comunicazioni e offerte del tuo trainer',
-            onTap: () => context.push('/announcements'),
-          ),
+          _SectionTitle(title: 'Aspetto'),
+          _ThemeToggleTile(currentMode: themeMode),
 
           const SizedBox(height: 24),
           OutlinedButton.icon(

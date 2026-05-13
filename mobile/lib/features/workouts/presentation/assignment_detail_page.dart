@@ -161,13 +161,25 @@ class _DetailContentState extends ConsumerState<_DetailContent>
         children: [
           Hero(
             tag: 'assignment-${assignment.id}',
-            flightShuttleBuilder: (_, anim, _, _, _) {
+            flightShuttleBuilder: (_, _, _, _, _) {
               return Material(
                 color: Colors.transparent,
-                child: _HeroHeader(
-                  templateName: template.nomeTemplate,
-                  dateStr: dateStr,
-                  splitSettimanale: template.splitSettimanale,
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        theme.colorScheme.primary,
+                        Color.lerp(
+                              theme.colorScheme.primary,
+                              AppColors.brandAccent,
+                              0.4,
+                            ) ??
+                            theme.colorScheme.primary,
+                      ],
+                    ),
+                  ),
                 ),
               );
             },

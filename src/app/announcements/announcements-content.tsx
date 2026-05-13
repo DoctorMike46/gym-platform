@@ -426,7 +426,7 @@ export default function AnnouncementsContent({
 
             {/* List */}
             <TooltipProvider>
-                <div className="rounded-xl border border-slate-200 bg-white shadow-sm mt-6 w-full max-w-full overflow-x-auto">
+                <div className="hidden md:block rounded-xl border border-slate-200 bg-white shadow-sm mt-6 w-full max-w-full overflow-x-auto">
                     <Table className="w-full min-w-[700px]">
                         <TableHeader className="bg-slate-50">
                             <TableRow className="hover:bg-slate-50 border-slate-200">
@@ -561,6 +561,125 @@ export default function AnnouncementsContent({
                             ))}
                         </TableBody>
                     </Table>
+                </div>
+
+                {/* Mobile: card list */}
+                <div className="md:hidden space-y-2 mt-4">
+                    {filteredAnnouncements.length === 0 ? (
+                        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center">
+                            <Megaphone className="mx-auto text-slate-300 mb-3" size={40} />
+                            <p className="text-sm font-medium text-slate-500">Nessun risultato</p>
+                            <p className="text-xs text-slate-400 mt-1">
+                                Non ci sono annunci che corrispondono a questa ricerca
+                            </p>
+                        </div>
+                    ) : (
+                        filteredAnnouncements.map((ann) => (
+                            <div
+                                key={ann.id}
+                                className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() => setViewing(ann)}
+                                    className="w-full text-left px-4 py-3 hover:bg-slate-50 transition-colors"
+                                >
+                                    <div className="flex items-start justify-between gap-2 mb-2">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="font-semibold text-slate-900 truncate">
+                                                {ann.titolo}
+                                            </div>
+                                            <p className="text-xs text-slate-500 line-clamp-2 mt-0.5">
+                                                {ann.contenuto}
+                                            </p>
+                                        </div>
+                                        <Eye size={16} className="text-slate-300 shrink-0 mt-0.5" />
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        <Badge
+                                            variant="outline"
+                                            className={`shadow-none font-medium border text-[10px] ${
+                                                ann.tipo === "offerta"
+                                                    ? "bg-green-50 text-green-700 border-green-200"
+                                                    : "bg-blue-50 text-blue-700 border-blue-200"
+                                            }`}
+                                        >
+                                            <Tag size={10} className="mr-0.5" />
+                                            {ann.tipo === "offerta" ? "Offerta" : "Annuncio"}
+                                        </Badge>
+                                        {ann.pubblicato ? (
+                                            <Badge
+                                                variant="outline"
+                                                className="bg-emerald-50 text-emerald-700 border-emerald-200 shadow-none text-[10px]"
+                                            >
+                                                Pubblicato
+                                            </Badge>
+                                        ) : (
+                                            <Badge
+                                                variant="outline"
+                                                className="bg-slate-100 text-slate-600 border-slate-200 shadow-none text-[10px]"
+                                            >
+                                                Bozza
+                                            </Badge>
+                                        )}
+                                        {ann.email_inviata && (
+                                            <Badge
+                                                variant="outline"
+                                                className="bg-purple-50 text-purple-700 border-purple-200 shadow-none text-[10px]"
+                                            >
+                                                <Mail size={9} className="mr-0.5" />
+                                                Email
+                                            </Badge>
+                                        )}
+                                        <span className="text-[10px] text-slate-400 ml-auto">
+                                            {new Date(ann.created_at).toLocaleDateString(
+                                                "it-IT",
+                                                {
+                                                    day: "2-digit",
+                                                    month: "short",
+                                                }
+                                            )}
+                                        </span>
+                                    </div>
+                                </button>
+                                <div className="flex items-center border-t border-slate-100">
+                                    {!ann.pubblicato && (
+                                        <>
+                                            <button
+                                                type="button"
+                                                onClick={() =>
+                                                    setConfirmPublish(ann.id)
+                                                }
+                                                disabled={loading}
+                                                className="flex-1 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                                            >
+                                                <Send size={13} />
+                                                Pubblica
+                                            </button>
+                                            <div className="w-px h-6 bg-slate-100" />
+                                            <button
+                                                type="button"
+                                                onClick={() => openEdit(ann)}
+                                                className="flex-1 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center justify-center gap-1.5 transition-colors"
+                                            >
+                                                <Pencil size={13} />
+                                                Modifica
+                                            </button>
+                                            <div className="w-px h-6 bg-slate-100" />
+                                        </>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => setConfirmDelete(ann.id)}
+                                        className="flex-1 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center justify-center gap-1.5 transition-colors"
+                                    >
+                                        <Trash2 size={13} />
+                                        Elimina
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </TooltipProvider>
 

@@ -43,9 +43,13 @@ export async function validateInviteToken(token: string): Promise<InviteValidati
 export async function completeOnboarding(
     token: string,
     password: string,
-    acceptTerms: boolean
+    consents: { terms: boolean; health: boolean; marketing: boolean } | boolean
 ): Promise<{ success: true } | { success: false; error: string }> {
-    const result = await completeClientOnboarding(token, password, acceptTerms);
+    const normalized =
+        typeof consents === "boolean"
+            ? { terms: consents, health: consents, marketing: false }
+            : consents;
+    const result = await completeClientOnboarding(token, password, normalized);
     if (!result.success) return result;
 
     const sessionToken = await createClientSessionToken(result.client);

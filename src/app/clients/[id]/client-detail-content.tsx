@@ -27,7 +27,8 @@ import {
 import {
     ArrowLeft, User, Mail, Weight, Ruler,
     Calendar, CreditCard, Edit2, CheckCircle2, XCircle,
-    RefreshCw, Trash2, Hash, Dumbbell, Plus, Power, Activity, Download
+    RefreshCw, Trash2, Hash, Dumbbell, Plus, Power, Activity, Download,
+    Utensils, ChevronDown, ChevronRight,
 } from "lucide-react";
 import { updateClient } from "@/lib/actions/clients";
 import { createSubscription, deleteSubscription, renewSubscription } from "@/lib/actions/subscriptions";
@@ -43,10 +44,12 @@ export default function ClientDetailContent({
     client,
     services,
     templates,
+    mealPlan,
 }: {
     client: any;
     services: any[];
     templates: any[];
+    mealPlan: { plan: any; meals: any[] } | null;
 }) {
     const router = useRouter();
     // Edit Profile
@@ -269,8 +272,8 @@ export default function ClientDetailContent({
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                    {/* Left col */}
-                    <div className="lg:col-span-2 space-y-5">
+                    {/* Left col — su mobile è il secondo, su lg è il primo */}
+                    <div className="lg:col-span-2 space-y-5 order-2 lg:order-1">
                         {/* Dati Personali */}
                         <Card className="bg-white border-slate-200 shadow-sm">
                             <CardHeader className="pb-3 border-b border-slate-100">
@@ -423,6 +426,9 @@ export default function ClientDetailContent({
                             </CardContent>
                         </Card>
 
+                        {/* Piano Alimentare */}
+                        <NutritionPlanCard mealPlan={mealPlan} clientId={client.id} />
+
                         {/* Abbonamenti */}
                         <Card className="bg-white border-slate-200 shadow-sm">
                             <CardHeader className="pb-3 border-b border-slate-100">
@@ -528,8 +534,8 @@ export default function ClientDetailContent({
                         </Card>
                     </div>
 
-                    {/* Right sidebar */}
-                    <div className="space-y-5">
+                    {/* Right sidebar — su mobile in cima per panoramica rapida */}
+                    <div className="space-y-5 order-1 lg:order-2">
                         <Card className="bg-white border-slate-200 shadow-sm">
                             <CardHeader className="pb-3 border-b border-slate-100">
                                 <CardTitle className="text-base">Stato Globale</CardTitle>
@@ -823,5 +829,258 @@ function InfoRow({ icon, label, value }: { icon: React.ReactNode; label: string;
             </span>
             <span className="text-sm font-medium text-slate-800">{value}</span>
         </div>
+    );
+}
+
+const MOMENTO_LABEL: Record<string, string> = {
+    colazione: "Colazione",
+    spuntino_mat: "Spuntino mattina",
+    pranzo: "Pranzo",
+    spuntino_pom: "Spuntino pomeriggio",
+    cena: "Cena",
+    pre_nanna: "Pre-nanna",
+};
+const MOMENTO_ORDER: Record<string, number> = {
+    colazione: 0,
+    spuntino_mat: 1,
+    pranzo: 2,
+    spuntino_pom: 3,
+    cena: 4,
+    pre_nanna: 5,
+};
+const GIORNI_LABELS = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
+
+function NutritionPlanCard({
+    mealPlan,
+    clientId,
+}: {
+    mealPlan: { plan: any; meals: any[] } | null;
+    clientId: number;
+}) {
+    const [expandedDay, setExpandedDay] = useState<number | null>(() => {
+        // Default: oggi
+        const wd = new Date().getDay();
+        return wd === 0 ? 7 : wd; // Domenica = 7
+    });
+
+    if (!mealPlan) {
+        return (
+            <Card className="bg-white border-slate-200 shadow-sm">
+                <CardHeader className="pb-3 border-b border-slate-100">
+                    <div className="flex justify-between items-center">
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <Utensils size={16} className="brand-text" /> Piano Alimentare
+                        </CardTitle>
+                        <Link href="/nutrition">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 text-xs gap-1.5 brand-text brand-border brand-hover-bg"
+                            >
+                                <Plus size={12} /> Crea piano
+                            </Button>
+                        </Link>
+                    </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                    <p className="text-slate-400 text-sm text-center py-4">
+                        Nessun piano alimentare attivo. Crealo dalla sezione Nutrizione.
+                    </p>
+                </CardContent>
+            </Card>
+        );
+    }
+
+    const { plan, meals } = mealPlan;
+    const byDay = new Map<number, any[]>();
+    for (const m of meals) {
+        const arr = byDay.get(m.giorno_settimana) ?? [];
+        arr.push(m);
+        byDay.set(m.giorno_settimana, arr);
+    }
+    for (const arr of byDay.values()) {
+        arr.sort(
+            (a, b) =>
+                (MOMENTO_ORDER[a.momento] ?? 99) -
+                (MOMENTO_ORDER[b.momento] ?? 99)
+        );
+    }
+
+    const hasMacros =
+        plan.kcal_target ||
+        plan.proteine_g ||
+        plan.carbo_g ||
+        plan.grassi_g;
+
+    return (
+        <Card className="bg-white border-slate-200 shadow-sm">
+            <CardHeader className="pb-3 border-b border-slate-100">
+                <div className="flex justify-between items-center gap-2">
+                    <CardTitle className="text-base flex items-center gap-2 min-w-0">
+                        <Utensils size={16} className="brand-text shrink-0" />
+                        <span className="truncate">Piano Alimentare</span>
+                        <Badge className="brand-bg text-white text-[10px] font-bold tracking-wide shrink-0 px-2 py-0">
+                            ATTIVO
+                        </Badge>
+                    </CardTitle>
+                    <Link href="/nutrition">
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs gap-1.5 brand-text brand-border brand-hover-bg"
+                        >
+                            <Edit2 size={12} /> Modifica
+                        </Button>
+                    </Link>
+                </div>
+            </CardHeader>
+            <CardContent className="pt-4 space-y-4">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                    <span className="font-semibold text-slate-900">
+                        {plan.nome}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                        Dal{" "}
+                        {new Date(plan.data_inizio).toLocaleDateString("it-IT")}
+                        {plan.data_fine &&
+                            ` al ${new Date(plan.data_fine).toLocaleDateString("it-IT")}`}
+                    </span>
+                </div>
+
+                {hasMacros && (
+                    <div className="flex flex-wrap gap-2">
+                        {plan.kcal_target && (
+                            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-slate-100 text-slate-700">
+                                {plan.kcal_target} kcal
+                            </span>
+                        )}
+                        {plan.proteine_g && (
+                            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-rose-50 text-rose-700">
+                                P {plan.proteine_g}g
+                            </span>
+                        )}
+                        {plan.carbo_g && (
+                            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-sky-50 text-sky-700">
+                                C {plan.carbo_g}g
+                            </span>
+                        )}
+                        {plan.grassi_g && (
+                            <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-amber-50 text-amber-700">
+                                G {plan.grassi_g}g
+                            </span>
+                        )}
+                    </div>
+                )}
+
+                <div className="space-y-2">
+                    {GIORNI_LABELS.map((label, i) => {
+                        const day = i + 1;
+                        const dayMeals = byDay.get(day) ?? [];
+                        const expanded = expandedDay === day;
+                        const empty = dayMeals.length === 0;
+                        return (
+                            <div
+                                key={day}
+                                className={`rounded-lg border ${
+                                    expanded
+                                        ? "brand-border bg-slate-50/40"
+                                        : "border-slate-200"
+                                }`}
+                            >
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setExpandedDay(expanded ? null : day)
+                                    }
+                                    className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-slate-50 transition-colors rounded-lg"
+                                >
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        {expanded ? (
+                                            <ChevronDown
+                                                size={14}
+                                                className="brand-text shrink-0"
+                                            />
+                                        ) : (
+                                            <ChevronRight
+                                                size={14}
+                                                className="text-slate-400 shrink-0"
+                                            />
+                                        )}
+                                        <span className="font-semibold text-sm text-slate-700">
+                                            {label}
+                                        </span>
+                                        <span className="text-xs text-slate-400">
+                                            {empty
+                                                ? "Nessun pasto"
+                                                : `${dayMeals.length} ${dayMeals.length === 1 ? "pasto" : "pasti"}`}
+                                        </span>
+                                    </div>
+                                </button>
+                                {expanded && !empty && (
+                                    <div className="px-3 pb-3 pt-1 space-y-2 border-t border-slate-100">
+                                        {dayMeals.map((m) => (
+                                            <div
+                                                key={m.id}
+                                                className="rounded-md border border-slate-200 bg-white px-3 py-2"
+                                            >
+                                                <div className="flex items-center justify-between gap-2 mb-1">
+                                                    <span className="text-[10px] font-bold tracking-wider uppercase brand-text">
+                                                        {MOMENTO_LABEL[m.momento] ?? m.momento}
+                                                    </span>
+                                                    {m.kcal && (
+                                                        <span className="text-xs font-semibold text-slate-700 tabular-nums">
+                                                            {m.kcal} kcal
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-sm text-slate-700 whitespace-pre-line">
+                                                    {m.descrizione}
+                                                </p>
+                                                {(m.proteine_g ||
+                                                    m.carbo_g ||
+                                                    m.grassi_g) && (
+                                                    <div className="flex gap-1.5 mt-1.5">
+                                                        {m.proteine_g && (
+                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 tabular-nums">
+                                                                P {m.proteine_g}g
+                                                            </span>
+                                                        )}
+                                                        {m.carbo_g && (
+                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-sky-50 text-sky-700 tabular-nums">
+                                                                C {m.carbo_g}g
+                                                            </span>
+                                                        )}
+                                                        {m.grassi_g && (
+                                                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 tabular-nums">
+                                                                G {m.grassi_g}g
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {m.note && (
+                                                    <p className="text-xs text-slate-500 italic mt-1">
+                                                        {m.note}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {plan.note && (
+                    <div className="rounded-md bg-slate-50 border border-slate-200 px-3 py-2 text-xs text-slate-600">
+                        <strong className="text-slate-700">Note:</strong>{" "}
+                        {plan.note}
+                    </div>
+                )}
+
+                {/* clientId riservato per eventuali azioni future (es. duplica piano) */}
+                <input type="hidden" value={clientId} />
+            </CardContent>
+        </Card>
     );
 }

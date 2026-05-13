@@ -3,6 +3,7 @@ import {
     body_measurements,
     client_workout_assignments,
     workout_logs,
+    workout_templates,
 } from "@/db/schema";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
 import type { ClientSession } from "@/lib/client-auth";
@@ -24,6 +25,10 @@ export interface ClientStats {
     volume_this_week: number;
     /** Schede attive (assignments con attivo=true) */
     active_assignments: number;
+    /** Split settimanale (giorni/sett) della prima scheda attiva, null se nessuna */
+    weekly_split_target: number | null;
+    /** Date YYYY-MM-DD (distinte) dei workout completed negli ultimi 7 giorni */
+    weekly_workout_dates: string[];
     /** Prossimo allenamento suggerito (assignment_id, giorno) basato sull'ultimo log */
     next_suggested: { assignment_id: number; giorno: number } | null;
 }
@@ -52,10 +57,14 @@ export async function getClientStats(session: ClientSession): Promise<ClientStat
         .orderBy(desc(workout_logs.date_executed));
 
     const sevenAgoStr = sevenAgo.toISOString().slice(0, 10);
-    const workouts_this_week = completedRows.filter(
+    const completedLast7 = completedRows.filter(
         (r) => r.date_executed >= sevenAgoStr
-    ).length;
+    );
+    const workouts_this_week = completedLast7.length;
     const workouts_this_month = completedRows.length;
+    const weekly_workout_dates = Array.from(
+        new Set(completedLast7.map((r) => r.date_executed))
+    );
 
     // Streak: giorni consecutivi con almeno un workout completed, terminando oggi o ieri
     const datesSet = new Set(completedRows.map((r) => r.date_executed));
@@ -129,10 +138,17 @@ export async function getClientStats(session: ClientSession): Promise<ClientStat
         volume_this_week = Math.round(Number.isFinite(v) ? v : 0);
     }
 
-    // Schede attive
+    // Schede attive (con split settimanale dal template)
     const activeAssign = await db
-        .select({ id: client_workout_assignments.id })
+        .select({
+            id: client_workout_assignments.id,
+            split_settimanale: workout_templates.split_settimanale,
+        })
         .from(client_workout_assignments)
+        .leftJoin(
+            workout_templates,
+            eq(workout_templates.id, client_workout_assignments.template_id)
+        )
         .where(
             and(
                 eq(client_workout_assignments.client_id, session.id),
@@ -140,6 +156,7 @@ export async function getClientStats(session: ClientSession): Promise<ClientStat
             )
         );
     const active_assignments = activeAssign.length;
+    const weekly_split_target = activeAssign[0]?.split_settimanale ?? null;
 
     // Prossimo suggerito = assignment dell'ultimo log + giorno+1 (modulo split)
     let next_suggested: ClientStats["next_suggested"] = null;
@@ -162,6 +179,8 @@ export async function getClientStats(session: ClientSession): Promise<ClientStat
         weight_change_30d,
         volume_this_week,
         active_assignments,
+        weekly_split_target,
+        weekly_workout_dates,
         next_suggested,
     };
 }

@@ -249,11 +249,20 @@ export type CompleteOnboardingResult =
 export async function completeClientOnboarding(
     token: string,
     password: string,
-    acceptTerms: boolean
+    consents: { terms: boolean; health: boolean; marketing: boolean }
 ): Promise<CompleteOnboardingResult> {
     try {
-        if (!acceptTerms) {
-            return { success: false, error: "Devi accettare i termini per continuare" };
+        if (!consents.terms) {
+            return {
+                success: false,
+                error: "Devi accettare i Termini di Servizio e la Privacy Policy per continuare",
+            };
+        }
+        if (!consents.health) {
+            return {
+                success: false,
+                error: "Il consenso al trattamento dei dati di salute è necessario per usare il servizio",
+            };
         }
 
         const policy = validatePassword(password);
@@ -281,6 +290,9 @@ export async function completeClientOnboarding(
                 password_set_at: now,
                 password_changed_at: now,
                 portal_terms_accepted_at: now,
+                privacy_accepted_at: now,
+                health_data_consent_at: now,
+                marketing_consent_at: consents.marketing ? now : null,
                 invite_token: null,
                 invite_token_expires_at: null,
                 is_active: true,

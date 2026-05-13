@@ -14,6 +14,11 @@ import {
     ChevronRight,
     Settings,
     LogOut,
+    Utensils,
+    CalendarCheck,
+    CalendarClock,
+    MessageCircle,
+    ListChecks,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -128,8 +133,13 @@ export function SidebarContent({
             <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto no-scrollbar py-2">
                 <SidebarItem href="/" icon={<LayoutDashboard size={20} />} label="Dashboard" isCollapsed={isCollapsed} pathname={pathname} onNavigate={onNavigate} />
                 <SidebarItem href="/clients" icon={<Users size={20} />} label="Clienti" isCollapsed={isCollapsed} pathname={pathname} onNavigate={onNavigate} />
+                <SidebarItem href="/chat" icon={<MessageCircle size={20} />} label="Chat" isCollapsed={isCollapsed} pathname={pathname} onNavigate={onNavigate} />
                 <SidebarItem href="/workouts" icon={<ClipboardList size={20} />} label="Schede" isCollapsed={isCollapsed} pathname={pathname} onNavigate={onNavigate} />
                 <SidebarItem href="/exercises" icon={<Dumbbell size={20} />} label="Esercizi" isCollapsed={isCollapsed} pathname={pathname} onNavigate={onNavigate} />
+                <SidebarItem href="/nutrition" icon={<Utensils size={20} />} label="Nutrizione" isCollapsed={isCollapsed} pathname={pathname} onNavigate={onNavigate} />
+                <SidebarItem href="/questionnaires" icon={<ListChecks size={20} />} label="Questionari" isCollapsed={isCollapsed} pathname={pathname} onNavigate={onNavigate} />
+                <SidebarItem href="/bookings" icon={<CalendarCheck size={20} />} label="Prenotazioni" isCollapsed={isCollapsed} pathname={pathname} onNavigate={onNavigate} />
+                <SidebarItem href="/availability" icon={<CalendarClock size={20} />} label="Disponibilità" isCollapsed={isCollapsed} pathname={pathname} onNavigate={onNavigate} />
                 <SidebarItem href="/services" icon={<Wallet size={20} />} label="Servizi" isCollapsed={isCollapsed} pathname={pathname} onNavigate={onNavigate} />
                 <SidebarItem href="/announcements" icon={<Megaphone size={20} />} label="Annunci" isCollapsed={isCollapsed} pathname={pathname} onNavigate={onNavigate} />
                 <SidebarItem href="/documents" icon={<FileText size={20} />} label="Documenti" isCollapsed={isCollapsed} pathname={pathname} onNavigate={onNavigate} />

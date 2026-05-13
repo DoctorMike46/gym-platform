@@ -9,6 +9,7 @@ import '../../../core/widgets/skeleton.dart';
 import '../../../shared/utils/date_format_it.dart';
 import '../data/workouts_repository.dart';
 import '../domain/workout_models.dart';
+import 'widgets/exercise_attachments_section.dart';
 
 class WorkoutHistoryPage extends ConsumerWidget {
   const WorkoutHistoryPage({super.key, required this.assignmentId});
@@ -553,6 +554,12 @@ class _ExerciseLogRow extends StatelessWidget {
               ),
             ),
           ],
+          const SizedBox(height: 10),
+          ExerciseAttachmentsSection(
+            exerciseLogId: row.exerciseLog.id,
+            initial: row.attachments,
+            compact: true,
+          ),
         ],
       ),
     );

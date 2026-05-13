@@ -140,7 +140,8 @@ export default function WorkoutsContent({ templates }: { templates: any[] }) {
                     </div>
                 </div>
 
-                <div className="rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
+                {/* Desktop: tabella */}
+                <div className="hidden md:block rounded-md border border-slate-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
                     <Table>
                         <TableHeader className="bg-slate-50">
                             <TableRow className="hover:bg-slate-50 border-slate-200">
@@ -252,6 +253,112 @@ export default function WorkoutsContent({ templates }: { templates: any[] }) {
                             ))}
                         </TableBody>
                     </Table>
+                </div>
+
+                {/* Mobile: card list */}
+                <div className="md:hidden space-y-2">
+                    {filteredTemplates.length === 0 ? (
+                        <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                            <div className="flex flex-col items-center gap-2">
+                                <Dumbbell className="h-8 w-8 opacity-20" />
+                                <p>
+                                    {templates.length === 0
+                                        ? "Nessun programma salvato. Inizia creandone uno nuovo."
+                                        : "Nessun programma trovato con i filtri attuali."}
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        filteredTemplates.map((template) => (
+                            <div
+                                key={template.id}
+                                className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden"
+                            >
+                                <Link
+                                    href={`/workouts/builder?edit=${template.id}`}
+                                    className="block px-4 py-3 hover:bg-slate-50 transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-lg brand-bg/10 bg-slate-100 flex items-center justify-center brand-text shrink-0">
+                                            <FileText size={18} />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="font-semibold text-slate-900 truncate brand-text">
+                                                {template.nome_template}
+                                            </div>
+                                            <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                                                <span>
+                                                    {template.split_settimanale} sessioni
+                                                </span>
+                                                <span className="text-slate-300">·</span>
+                                                <span>
+                                                    {new Date(
+                                                        template.created_at
+                                                    ).toLocaleDateString("it-IT")}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <Eye
+                                            size={16}
+                                            className="text-slate-300 shrink-0"
+                                        />
+                                    </div>
+                                </Link>
+                                <div className="flex items-center border-t border-slate-100">
+                                    <button
+                                        type="button"
+                                        onClick={(e) =>
+                                            handleDownloadPDF(template.id, e)
+                                        }
+                                        className="flex-1 px-3 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center justify-center gap-1.5 transition-colors"
+                                    >
+                                        <Download size={13} />
+                                        PDF
+                                    </button>
+                                    <div className="w-px h-6 bg-slate-100" />
+                                    <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                            <button
+                                                type="button"
+                                                className="flex-1 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 flex items-center justify-center gap-1.5 transition-colors"
+                                            >
+                                                <Trash2 size={13} />
+                                                Elimina
+                                            </button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent>
+                                            <AlertDialogHeader>
+                                                <AlertDialogTitle>
+                                                    Sei sicuro?
+                                                </AlertDialogTitle>
+                                                <AlertDialogDescription>
+                                                    Eliminerai il template{" "}
+                                                    <strong>
+                                                        {template.nome_template}
+                                                    </strong>
+                                                    . L&apos;operazione è irreversibile.
+                                                </AlertDialogDescription>
+                                            </AlertDialogHeader>
+                                            <AlertDialogFooter>
+                                                <AlertDialogCancel>
+                                                    Annulla
+                                                </AlertDialogCancel>
+                                                <AlertDialogAction
+                                                    className="bg-rose-600 hover:bg-rose-700 text-white"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        handleDelete(template.id);
+                                                    }}
+                                                >
+                                                    Elimina
+                                                </AlertDialogAction>
+                                            </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                    </AlertDialog>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
         </TooltipProvider>

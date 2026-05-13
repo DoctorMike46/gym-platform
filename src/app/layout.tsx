@@ -3,6 +3,21 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AppLayout } from "@/components/layout/app-layout";
 import { getSettings } from "@/lib/actions/settings";
+import { countPendingAppointments } from "@/lib/actions/appointments-trainer";
+import { countUnreadForTrainer } from "@/lib/actions/chat";
+
+async function getTrainerCounters() {
+    try {
+        const [pendingBookings, unreadMessages] = await Promise.all([
+            countPendingAppointments(),
+            countUnreadForTrainer(),
+        ]);
+        return { pendingBookings, unreadMessages };
+    } catch {
+        // Utente non autenticato (es. /login, /portal): niente counter
+        return null;
+    }
+}
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -36,7 +51,10 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const settingsData = await getSettings();
+  const [settingsData, counters] = await Promise.all([
+    getSettings(),
+    getTrainerCounters(),
+  ]);
 
   const primaryColor = settingsData?.primary_color || "#003366";
   const sidebarColor = settingsData?.sidebar_color || "#003366";
@@ -56,7 +74,7 @@ export default async function RootLayout({
         }} />
       </head>
       <body className={inter.className}>
-        <AppLayout settings={settingsData}>
+        <AppLayout settings={settingsData} counters={counters}>
           {children}
         </AppLayout>
       </body>

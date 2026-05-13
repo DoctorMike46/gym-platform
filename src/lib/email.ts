@@ -254,10 +254,10 @@ export async function sendClientInviteEmail(params: {
                         <div class="header"><h1>${params.platformName}</h1></div>
                         <div class="content">
                             <h2 class="title">Benvenuto, ${params.clientName}!</h2>
-                            <p>${params.trainerName} ti ha invitato sul portale clienti di ${params.platformName}.</p>
-                            <p>Da qui potrai consultare le tue schede, tracciare i tuoi progressi, vedere documenti e gestire il tuo abbonamento.</p>
+                            <p>${params.trainerName} ti ha invitato su ${params.platformName}.</p>
+                            <p>Clicca sul pulsante qui sotto per <strong>impostare la tua password</strong>. Dopo l'attivazione potrai scaricare l'app e accedere con la tua email per consultare schede, progressi, piano alimentare e prenotare le sessioni.</p>
                             <div style="text-align: center; margin: 32px 0;">
-                                <a href="${params.inviteLink}" class="button">Attiva il tuo Account</a>
+                                <a href="${params.inviteLink}" class="button">Attiva il tuo account</a>
                             </div>
                             <p>Il link scadrà tra 7 giorni. Se hai problemi, contatta il tuo trainer.</p>
                             <p style="font-size: 13px; color: #64748b; margin-top: 24px;">

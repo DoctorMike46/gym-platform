@@ -23,20 +23,17 @@ const TRAINER_PUBLIC_PATHS = [
     "/api/media/public",
 ];
 
-const CLIENT_PUBLIC_PATHS = [
-    "/portal/login",
-    "/portal/forgot-password",
-    "/portal/reset-password",
-    "/portal/onboarding",
-    "/api/portal/auth/login",
-    "/api/portal/auth/logout",
-];
 
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // Mobile REST API: gestisce auth/errori in JSON puro per-route
     if (pathname.startsWith("/api/v1")) {
+        return NextResponse.next();
+    }
+
+    // Cron jobs: protetti via CRON_SECRET o header Vercel Cron lato handler
+    if (pathname.startsWith("/api/cron")) {
         return NextResponse.next();
     }
 
@@ -53,24 +50,31 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next();
     }
 
-    // Client portal namespace
-    if (pathname.startsWith("/portal") || pathname.startsWith("/api/portal")) {
-        if (CLIENT_PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
-            return NextResponse.next();
-        }
-        const token = request.cookies.get("client_session")?.value;
-        if (!token) {
-            return NextResponse.redirect(new URL("/portal/login", request.url));
-        }
-        try {
-            const { payload } = await jwtVerify(token, JWT_SECRET);
-            if (payload.aud !== "client") throw new Error("wrong audience");
-            return NextResponse.next();
-        } catch {
-            const response = NextResponse.redirect(new URL("/portal/login", request.url));
-            response.cookies.set("client_session", "", { httpOnly: true, maxAge: 0, path: "/" });
-            return response;
-        }
+    // Pagine legali pubbliche (richieste GDPR)
+    if (pathname.startsWith("/legal")) {
+        return NextResponse.next();
+    }
+
+    // Portale web cliente: DECOMMISSIONATO con eccezioni.
+    // Le route mantenute pubbliche servono SOLO per il flusso di
+    // attivazione account (link email dal trainer) e reset password.
+    // Tutto il resto redirige alla landing "Scarica l'app".
+    const PORTAL_PUBLIC_PREFIXES = [
+        "/portal/onboarding/",
+        "/portal/reset-password/",
+        "/portal/forgot-password",
+    ];
+    if (pathname === "/portal") {
+        return NextResponse.next();
+    }
+    if (PORTAL_PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
+        return NextResponse.next();
+    }
+    if (pathname.startsWith("/portal/")) {
+        return NextResponse.redirect(new URL("/portal", request.url));
+    }
+    if (pathname.startsWith("/api/portal")) {
+        return NextResponse.next();
     }
 
     // Trainer namespace

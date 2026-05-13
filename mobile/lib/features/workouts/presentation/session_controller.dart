@@ -71,6 +71,26 @@ class ExerciseEditState {
     return max;
   }
 
+  /// Set "migliore" completato in questa sessione (peso più alto;
+  /// a parità, quello con più reps). Usato per la card riassuntiva
+  /// quando l'esercizio è completato.
+  SetEntry? get bestSet {
+    SetEntry? best;
+    for (final s in sets) {
+      if (!s.completed) continue;
+      if (best == null) {
+        best = s;
+        continue;
+      }
+      final w = s.weight ?? 0;
+      final bw = best.weight ?? 0;
+      if (w > bw || (w == bw && (s.reps ?? 0) > (best.reps ?? 0))) {
+        best = s;
+      }
+    }
+    return best;
+  }
+
   ExerciseEditState copyWithSets(List<SetEntry> sets) =>
       ExerciseEditState(
         templateExerciseId: templateExerciseId,
@@ -639,11 +659,17 @@ class SessionController extends StateNotifier<AsyncValue<SessionState>> {
     if (current is! AsyncData<SessionState>) return;
     final rt = current.value.restTimer;
     if (rt == null) return;
+    final newRemaining = rt.remaining + Duration(seconds: extraSeconds);
+    if (newRemaining.inSeconds <= 0) {
+      cancelRestTimer();
+      return;
+    }
+    final newTotal = (rt.totalSeconds + extraSeconds).clamp(1, 3600);
     state = AsyncData(
       current.value.copyWith(
         restTimer: RestTimerState(
-          totalSeconds: rt.totalSeconds + extraSeconds,
-          remaining: rt.remaining + Duration(seconds: extraSeconds),
+          totalSeconds: newTotal,
+          remaining: newRemaining,
           exerciseLabel: rt.exerciseLabel,
         ),
       ),

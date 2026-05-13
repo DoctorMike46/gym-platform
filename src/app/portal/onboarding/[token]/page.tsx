@@ -16,9 +16,11 @@ export default async function OnboardingPage({
     if (!validation.valid) {
         const reason = validation.reason;
         const messages = {
-            expired: "Il link di invito è scaduto. Contatta il tuo trainer per riceverne uno nuovo.",
+            expired:
+                "Il link di invito è scaduto. Contatta il tuo trainer per riceverne uno nuovo.",
             not_found: "Link di invito non valido.",
-            already_active: "Questo account è già stato attivato. Vai al login.",
+            already_active:
+                "Questo account è già stato attivato. Scarica l'app e accedi con la tua email.",
         };
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -30,8 +32,12 @@ export default async function OnboardingPage({
                         {reason === "already_active" ? "Account già attivo" : "Link non valido"}
                     </h1>
                     <p className="text-slate-500 text-sm mb-8">{messages[reason]}</p>
-                    <Link href="/portal/login" className="inline-flex h-12 items-center justify-center px-6 rounded-xl text-white font-semibold text-sm" style={{ background: settings?.primary_color || "#003366" }}>
-                        Vai al Login
+                    <Link
+                        href="/portal"
+                        className="inline-flex h-12 items-center justify-center px-6 rounded-xl text-white font-semibold text-sm"
+                        style={{ background: settings?.primary_color || "#003366" }}
+                    >
+                        Scarica l&apos;app
                     </Link>
                 </div>
             </div>

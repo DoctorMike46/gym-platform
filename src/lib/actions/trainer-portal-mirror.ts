@@ -117,7 +117,22 @@ async function loadLogDetail(
         .where(eq(workout_exercise_logs.workout_log_id, log.id))
         .orderBy(asc(workout_exercise_logs.ordine));
 
-    return { log, template, client, exerciseLogs: rows };
+    const { listAttachmentsForExerciseLogs } = await import(
+        "@/lib/services/workout-attachments.service"
+    );
+    const attachmentsByLog = await listAttachmentsForExerciseLogs(
+        rows.map((r) => r.exerciseLog.id)
+    );
+
+    return {
+        log,
+        template,
+        client,
+        exerciseLogs: rows.map((r) => ({
+            ...r,
+            attachments: attachmentsByLog[r.exerciseLog.id] ?? [],
+        })),
+    };
 }
 
 export async function getClientMeasurements(clientId: number) {

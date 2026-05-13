@@ -17,8 +17,8 @@ export default async function PortalForgotPasswordPage() {
                 <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden">
                     <div className="h-1.5 w-full" style={{ background: `linear-gradient(90deg, ${settings?.sidebar_color || "#003366"}, ${settings?.primary_color || "#1e40af"})` }} />
                     <div className="p-8 sm:p-10">
-                        <Link href="/portal/login" className="inline-flex items-center text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors mb-6">
-                            <ArrowLeft size={14} className="mr-1" /> Torna al login
+                        <Link href="/portal" className="inline-flex items-center text-xs font-semibold text-slate-400 hover:text-slate-600 transition-colors mb-6">
+                            <ArrowLeft size={14} className="mr-1" /> Indietro
                         </Link>
                         <h1 className="text-2xl font-black text-slate-900 tracking-tight">Recupero Password</h1>
                         <p className="text-slate-500 text-sm mt-2 mb-8">Inserisci la tua email per ricevere un link di ripristino</p>

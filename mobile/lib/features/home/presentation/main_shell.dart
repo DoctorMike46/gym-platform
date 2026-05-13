@@ -17,8 +17,14 @@ class MainShell extends StatelessWidget {
     _TabItem(
       icon: Icons.fitness_center_outlined,
       activeIcon: Icons.fitness_center_rounded,
-      label: 'Schede',
+      label: 'Workout',
       route: '/workouts',
+    ),
+    _TabItem(
+      icon: Icons.restaurant_outlined,
+      activeIcon: Icons.restaurant_rounded,
+      label: 'Nutrizione',
+      route: '/nutrition',
     ),
     _TabItem(
       icon: Icons.show_chart_outlined,
@@ -27,10 +33,10 @@ class MainShell extends StatelessWidget {
       route: '/progress',
     ),
     _TabItem(
-      icon: Icons.person_outline_rounded,
-      activeIcon: Icons.person_rounded,
-      label: 'Profilo',
-      route: '/profile',
+      icon: Icons.apps_rounded,
+      activeIcon: Icons.apps_rounded,
+      label: 'Altro',
+      route: '/altro',
     ),
   ];
 

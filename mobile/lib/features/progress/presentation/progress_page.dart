@@ -8,6 +8,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/skeleton.dart';
+import '../../../core/widgets/top_bar_actions.dart';
 import '../../../shared/utils/date_format_it.dart';
 import '../data/progress_repository.dart';
 import '../domain/progress_models.dart';
@@ -36,6 +37,7 @@ class _ProgressPageState extends State<ProgressPage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('Progressi'),
+        actions: const [TopBarActions()],
         bottom: TabBar(
           controller: _tabController,
           labelColor: theme.colorScheme.primary,

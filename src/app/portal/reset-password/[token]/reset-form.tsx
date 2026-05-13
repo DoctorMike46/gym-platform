@@ -1,16 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Eye, EyeOff, Save, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, Save, CheckCircle2, Download } from "lucide-react";
 import { resetClientPassword } from "@/lib/actions/portal-auth";
 import { validatePassword } from "@/lib/password-policy";
 import PasswordStrength from "@/components/ui/password-strength";
 
 export default function ResetForm({ token, primaryColor }: { token: string; primaryColor: string }) {
-    const router = useRouter();
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
@@ -39,7 +37,6 @@ export default function ResetForm({ token, primaryColor }: { token: string; prim
             const result = await resetClientPassword(token, password);
             if (result.success) {
                 setSuccess(true);
-                setTimeout(() => router.push("/portal/login"), 3000);
             } else {
                 setError(result.error || "Errore");
             }
@@ -52,12 +49,37 @@ export default function ResetForm({ token, primaryColor }: { token: string; prim
 
     if (success) {
         return (
-            <div className="text-center py-6">
-                <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg" style={{ backgroundColor: "#10b981" }}>
-                    <CheckCircle2 size={32} className="text-white" />
+            <div className="text-center space-y-6">
+                <div
+                    className="w-16 h-16 rounded-full flex items-center justify-center mx-auto"
+                    style={{ background: `${primaryColor}15` }}
+                >
+                    <CheckCircle2 size={32} style={{ color: primaryColor }} />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Password Aggiornata!</h3>
-                <p className="text-slate-500 text-sm">Stai per essere reindirizzato al login...</p>
+                <div>
+                    <h3 className="text-xl font-bold text-slate-900 mb-2">
+                        Password aggiornata!
+                    </h3>
+                    <p className="text-slate-500 text-sm">
+                        Apri l&apos;app e accedi con la tua nuova password.
+                    </p>
+                </div>
+                <div className="space-y-2">
+                    <a
+                        href="#"
+                        className="flex items-center justify-center gap-3 w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800 transition-colors text-white font-semibold text-sm"
+                    >
+                        <Download size={16} />
+                        Scarica per iPhone
+                    </a>
+                    <a
+                        href="#"
+                        className="flex items-center justify-center gap-3 w-full h-12 rounded-xl bg-slate-900 hover:bg-slate-800 transition-colors text-white font-semibold text-sm"
+                    >
+                        <Download size={16} />
+                        Scarica per Android
+                    </a>
+                </div>
             </div>
         );
     }

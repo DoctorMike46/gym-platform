@@ -14,6 +14,7 @@ import { and, asc, desc, eq } from "drizzle-orm";
 import { sendClientLoggedWorkoutEmail } from "@/lib/email";
 import type { ClientSession } from "@/lib/client-auth";
 import type { WorkoutLogDetail } from "@/lib/types/workout-log-detail";
+import { listAttachmentsForExerciseLogs } from "@/lib/services/workout-attachments.service";
 
 export async function listClientWorkouts(session: ClientSession) {
     return db
@@ -374,10 +375,17 @@ export async function getClientWorkoutLogDetail(
         .where(eq(workout_exercise_logs.workout_log_id, logId))
         .orderBy(asc(workout_exercise_logs.ordine));
 
+    const attachmentsByLog = await listAttachmentsForExerciseLogs(
+        rows.map((r) => r.exerciseLog.id)
+    );
+
     return {
         log,
         template,
         client: client ?? { nome: "", cognome: "" },
-        exerciseLogs: rows,
+        exerciseLogs: rows.map((r) => ({
+            ...r,
+            attachments: attachmentsByLog[r.exerciseLog.id] ?? [],
+        })),
     };
 }

@@ -7,6 +7,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
 import '../../../core/widgets/gradient_card.dart';
+import '../../../core/widgets/top_bar_actions.dart';
 import '../../../shared/utils/date_format_it.dart';
 import '../data/workouts_repository.dart';
 import '../domain/workout_models.dart';
@@ -21,12 +22,13 @@ class AssignmentsListPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Schede'),
+        title: const Text('Workout'),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh_rounded),
             onPressed: () => ref.invalidate(assignmentsListProvider),
           ),
+          const TopBarActions(),
         ],
       ),
       body: RefreshIndicator(

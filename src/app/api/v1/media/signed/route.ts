@@ -41,6 +41,21 @@ export async function GET(req: NextRequest) {
             .limit(1);
         allowed = !!photo;
     }
+    if (!allowed) {
+        // Allegati questionario: la key path è clients/<clientId>/questionnaires/...
+        // Il cliente può visualizzare solo i propri allegati.
+        const m = key.match(/^clients\/(\d+)\/questionnaires\//);
+        if (m && parseInt(m[1], 10) === auth.session.id) {
+            allowed = true;
+        }
+    }
+    if (!allowed) {
+        // Allegati workout: clients/<clientId>/workouts/<exerciseLogId>/...
+        const m = key.match(/^clients\/(\d+)\/workouts\//);
+        if (m && parseInt(m[1], 10) === auth.session.id) {
+            allowed = true;
+        }
+    }
 
     if (!allowed) {
         return jsonError("forbidden", "Risorsa non accessibile", 403);

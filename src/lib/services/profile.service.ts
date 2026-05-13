@@ -91,6 +91,18 @@ export async function getClientActiveSubscription(session: ClientSession) {
     return rows[0] || null;
 }
 
+export async function getClientSubscriptionsHistory(session: ClientSession) {
+    return db
+        .select({
+            sub: subscriptions,
+            service: services,
+        })
+        .from(subscriptions)
+        .leftJoin(services, eq(services.id, subscriptions.service_id))
+        .where(eq(subscriptions.client_id, session.id))
+        .orderBy(desc(subscriptions.data_inizio));
+}
+
 export interface TrainerBranding {
     site_name: string;
     logo_url: string | null;

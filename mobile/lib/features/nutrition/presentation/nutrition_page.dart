@@ -1,0 +1,514 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../../../core/network/api_exception.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../core/theme/app_radius.dart';
+import '../../../core/widgets/skeleton.dart';
+import '../../../core/widgets/top_bar_actions.dart';
+import '../data/nutrition_repository.dart';
+
+class NutritionPage extends ConsumerStatefulWidget {
+  const NutritionPage({super.key});
+
+  @override
+  ConsumerState<NutritionPage> createState() => _NutritionPageState();
+}
+
+class _NutritionPageState extends ConsumerState<NutritionPage>
+    with SingleTickerProviderStateMixin {
+  TabController? _tabController;
+  int _initialDayIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // weekday: Lun=1 … Dom=7 → index 0..6
+    _initialDayIndex = (DateTime.now().weekday - 1).clamp(0, 6);
+  }
+
+  @override
+  void dispose() {
+    _tabController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final asyncPlan = ref.watch(currentMealPlanProvider);
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Nutrizione'),
+        actions: const [TopBarActions()],
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async => ref.invalidate(currentMealPlanProvider),
+        child: asyncPlan.when(
+          loading: () => const SkeletonList(itemCount: 4, itemHeight: 120),
+          error: (e, _) => ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              const SizedBox(height: 80),
+              _ErrorBlock(
+                message: e is ApiException ? e.message : 'Errore di caricamento',
+                onRetry: () => ref.invalidate(currentMealPlanProvider),
+              ),
+            ],
+          ),
+          data: (plan) {
+            if (plan == null) return const _EmptyState();
+            return _PlanView(
+              plan: plan,
+              initialDayIndex: _initialDayIndex,
+              tabControllerHolder: (c) => _tabController = c,
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _PlanView extends StatefulWidget {
+  const _PlanView({
+    required this.plan,
+    required this.initialDayIndex,
+    required this.tabControllerHolder,
+  });
+
+  final MealPlan plan;
+  final int initialDayIndex;
+  final void Function(TabController) tabControllerHolder;
+
+  @override
+  State<_PlanView> createState() => _PlanViewState();
+}
+
+class _PlanViewState extends State<_PlanView>
+    with SingleTickerProviderStateMixin {
+  static const _dayLabels = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'];
+
+  late TabController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TabController(
+      length: 7,
+      vsync: this,
+      initialIndex: widget.initialDayIndex,
+    );
+    widget.tabControllerHolder(_controller);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final byDay = widget.plan.byDay;
+
+    return Column(
+      children: [
+        _PlanHeader(plan: widget.plan),
+        Material(
+          color: theme.scaffoldBackgroundColor,
+          child: TabBar(
+            controller: _controller,
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            labelColor: theme.colorScheme.primary,
+            unselectedLabelColor: theme.textTheme.bodySmall?.color,
+            indicatorColor: theme.colorScheme.primary,
+            indicatorSize: TabBarIndicatorSize.label,
+            labelStyle:
+                const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+            tabs: [for (final l in _dayLabels) Tab(text: l)],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: _controller,
+            children: [
+              for (var d = 1; d <= 7; d++)
+                _DayMealsList(meals: byDay[d] ?? const []),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlanHeader extends StatelessWidget {
+  const _PlanHeader({required this.plan});
+  final MealPlan plan;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasMacros = plan.kcalTarget != null ||
+        plan.proteineTarget != null ||
+        plan.carboTarget != null ||
+        plan.grassiTarget != null;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 14, 20, 16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            theme.colorScheme.primary,
+            Color.lerp(theme.colorScheme.primary, AppColors.brandAccent, 0.4) ??
+                theme.colorScheme.primary,
+          ],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            plan.nome,
+            style: theme.textTheme.titleLarge?.copyWith(
+              color: AppColors.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          if (plan.note != null && plan.note!.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              plan.note!,
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.white.withValues(alpha: 0.85),
+              ),
+            ),
+          ],
+          if (hasMacros) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                if (plan.kcalTarget != null)
+                  _MacroChip(label: 'kcal', value: '${plan.kcalTarget}'),
+                if (plan.proteineTarget != null)
+                  _MacroChip(label: 'P', value: '${plan.proteineTarget}g'),
+                if (plan.carboTarget != null)
+                  _MacroChip(label: 'C', value: '${plan.carboTarget}g'),
+                if (plan.grassiTarget != null)
+                  _MacroChip(label: 'G', value: '${plan.grassiTarget}g'),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MacroChip extends StatelessWidget {
+  const _MacroChip({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.white.withValues(alpha: 0.18),
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: AppColors.white.withValues(alpha: 0.85),
+              letterSpacing: 0.4,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w800,
+              color: AppColors.white,
+              fontFeatures: [FontFeature.tabularFigures()],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DayMealsList extends StatelessWidget {
+  const _DayMealsList({required this.meals});
+  final List<Meal> meals;
+
+  @override
+  Widget build(BuildContext context) {
+    if (meals.isEmpty) {
+      return ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(height: 80),
+          _EmptyDay(),
+        ],
+      );
+    }
+    return ListView.separated(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: BouncingScrollPhysics(),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      itemCount: meals.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, i) => _MealCard(meal: meals[i]),
+    );
+  }
+}
+
+class _MealCard extends StatelessWidget {
+  const _MealCard({required this.meal});
+  final Meal meal;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasMacros = meal.kcal != null ||
+        meal.proteine != null ||
+        meal.carbo != null ||
+        meal.grassi != null;
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: theme.colorScheme.outline),
+      ),
+      padding: const EdgeInsets.all(14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(AppRadius.pill),
+                ),
+                child: Text(
+                  meal.momento.label.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    color: theme.colorScheme.primary,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
+              if (meal.kcal != null) ...[
+                const Spacer(),
+                Text(
+                  '${meal.kcal} kcal',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: theme.colorScheme.primary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Text(meal.descrizione, style: theme.textTheme.bodyMedium),
+          if (hasMacros &&
+              (meal.proteine != null ||
+                  meal.carbo != null ||
+                  meal.grassi != null)) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                if (meal.proteine != null)
+                  _MealMacroChip(label: 'P', value: '${meal.proteine}g'),
+                if (meal.carbo != null)
+                  _MealMacroChip(label: 'C', value: '${meal.carbo}g'),
+                if (meal.grassi != null)
+                  _MealMacroChip(label: 'G', value: '${meal.grassi}g'),
+              ],
+            ),
+          ],
+          if (meal.note != null && meal.note!.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(
+                    Icons.sticky_note_2_outlined,
+                    size: 14,
+                    color: theme.colorScheme.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      meal.note!,
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _MealMacroChip extends StatelessWidget {
+  const _MealMacroChip({required this.label, required this.value});
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(AppRadius.pill),
+      ),
+      child: Text(
+        '$label $value',
+        style: theme.textTheme.labelSmall?.copyWith(
+          fontWeight: FontWeight.w700,
+          fontFeatures: const [FontFeature.tabularFigures()],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(32, 80, 32, 32),
+      children: [
+        Column(
+          children: [
+            Icon(
+              Icons.restaurant_rounded,
+              size: 64,
+              color: theme.colorScheme.primary.withValues(alpha: 0.4),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Nessun piano alimentare',
+              style: theme.textTheme.headlineSmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Il tuo trainer non ti ha ancora assegnato un piano. Quando lo farà lo vedrai qui.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyDay extends StatelessWidget {
+  const _EmptyDay();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        children: [
+          Icon(
+            Icons.no_meals_rounded,
+            size: 48,
+            color: theme.colorScheme.primary.withValues(alpha: 0.3),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Giorno libero',
+            style: theme.textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Nessun pasto pianificato in questo giorno.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorBlock extends StatelessWidget {
+  const _ErrorBlock({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Icon(Icons.cloud_off_rounded, size: 56, color: AppColors.danger),
+          const SizedBox(height: 16),
+          Text('Errore di caricamento', style: theme.textTheme.headlineSmall),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: 16),
+          FilledButton.tonalIcon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Riprova'),
+          ),
+        ],
+      ),
+    );
+  }
+}

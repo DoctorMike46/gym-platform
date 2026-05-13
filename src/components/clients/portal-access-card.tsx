@@ -73,7 +73,7 @@ export function PortalAccessCard({ clientId }: { clientId: number }) {
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                     <UserCheck size={18} />
-                    Portale Cliente
+                    Accesso app cliente
                 </CardTitle>
                 <Badge className={label.color}>{label.text}</Badge>
             </CardHeader>
@@ -143,7 +143,9 @@ export function PortalAccessCard({ clientId }: { clientId: number }) {
                 </div>
 
                 <p className="text-xs text-slate-400">
-                    Il cliente potrà accedere al portale per consultare schede, progressi e documenti.
+                    L&apos;invito è un link via email: il cliente imposta la password
+                    e poi accede all&apos;app mobile per consultare schede, progressi,
+                    piano alimentare e prenotare le sessioni.
                 </p>
 
                 <Link

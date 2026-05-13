@@ -13,6 +13,10 @@ interface CompleteBody {
     invite_token?: string;
     password?: string;
     accept_terms?: boolean;
+    /** Consenso esplicito al trattamento dei dati di salute (art. 9 GDPR). */
+    accept_health?: boolean;
+    /** Consenso opzionale al marketing. */
+    accept_marketing?: boolean;
     device_id?: string;
 }
 
@@ -31,7 +35,11 @@ export async function POST(req: NextRequest) {
     const result = await completeClientOnboarding(
         body.invite_token,
         body.password,
-        body.accept_terms === true
+        {
+            terms: body.accept_terms === true,
+            health: body.accept_health === true,
+            marketing: body.accept_marketing === true,
+        }
     );
 
     if (!result.success) {

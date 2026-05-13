@@ -56,12 +56,19 @@ export const clients = pgTable(
     invite_token_expires_at: timestamp("invite_token_expires_at"),
     is_active: boolean("is_active").default(true).notNull(),
     portal_terms_accepted_at: timestamp("portal_terms_accepted_at"),
+    // GDPR consents (art. 6/7/9)
+    privacy_accepted_at: timestamp("privacy_accepted_at"),
+    health_data_consent_at: timestamp("health_data_consent_at"),
+    marketing_consent_at: timestamp("marketing_consent_at"),
+    // Soft-delete tombstone (account cancellato dal cliente)
+    deleted_at: timestamp("deleted_at"),
     created_at: timestamp("created_at").defaultNow().notNull(),
     updated_at: timestamp("updated_at").defaultNow().notNull(),
   },
   (t) => ({
     trainerEmailIdx: uniqueIndex("clients_trainer_email_idx").on(t.trainer_id, t.email),
     inviteTokenIdx: index("clients_invite_token_idx").on(t.invite_token),
+    deletedAtIdx: index("clients_deleted_at_idx").on(t.deleted_at),
   })
 );
 
@@ -237,6 +244,273 @@ export const workout_exercise_logs = pgTable("workout_exercise_logs", {
   rpe_actual: jsonb("rpe_actual"),
   note: text("note"),
 });
+
+// ─── Workout exercise log attachments (foto/video per esercizio) ─────
+// kind: 'image' | 'video'
+// r2_key: clients/<clientId>/workouts/<exerciseLogId>/<ts>_<filename>
+export const workout_exercise_log_attachments = pgTable(
+  "workout_exercise_log_attachments",
+  {
+    id: serial("id").primaryKey(),
+    exercise_log_id: integer("exercise_log_id")
+      .references(() => workout_exercise_logs.id, { onDelete: 'cascade' })
+      .notNull(),
+    client_id: integer("client_id")
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
+    trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+    r2_key: text("r2_key").notNull(),
+    mime_type: text("mime_type").notNull(),
+    kind: text("kind").notNull(),
+    filename: text("filename"),
+    size_bytes: integer("size_bytes"),
+    duration_seconds: integer("duration_seconds"),
+    uploaded_at: timestamp("uploaded_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    logIdx: index("workout_attachments_log_idx").on(t.exercise_log_id),
+    clientIdx: index("workout_attachments_client_idx").on(
+      t.client_id,
+      t.uploaded_at
+    ),
+  })
+);
+
+// ─── Meal Plans (piani alimentari assegnati al cliente) ────────────
+export const meal_plans = pgTable("meal_plans", {
+  id: serial("id").primaryKey(),
+  trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+  client_id: integer("client_id").references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+  nome: text("nome").notNull(),
+  attivo: boolean("attivo").default(true).notNull(),
+  data_inizio: date("data_inizio").notNull(),
+  data_fine: date("data_fine"),
+  note: text("note"),
+  // Target macros giornalieri (opzionali)
+  kcal_target: integer("kcal_target"),
+  proteine_g: integer("proteine_g"),
+  carbo_g: integer("carbo_g"),
+  grassi_g: integer("grassi_g"),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── Meal Plan Meals (pasti per giorno della settimana) ────────────
+// momento: 'colazione' | 'spuntino_mat' | 'pranzo' | 'spuntino_pom' | 'cena' | 'pre_nanna'
+// giorno_settimana: 1=Lun, ..., 7=Dom
+export const meal_plan_meals = pgTable(
+  "meal_plan_meals",
+  {
+    id: serial("id").primaryKey(),
+    meal_plan_id: integer("meal_plan_id")
+      .references(() => meal_plans.id, { onDelete: 'cascade' })
+      .notNull(),
+    giorno_settimana: integer("giorno_settimana").notNull(),
+    momento: text("momento").notNull(),
+    ordine: integer("ordine").default(0).notNull(),
+    descrizione: text("descrizione").notNull(),
+    kcal: integer("kcal"),
+    proteine_g: integer("proteine_g"),
+    carbo_g: integer("carbo_g"),
+    grassi_g: integer("grassi_g"),
+    note: text("note"),
+  },
+  (t) => ({
+    planDayIdx: index("meal_plan_meals_plan_day_idx").on(
+      t.meal_plan_id,
+      t.giorno_settimana
+    ),
+  })
+);
+
+// ─── Appointment Types (tipologie di sessione bookabili) ───────────
+export const appointment_types = pgTable("appointment_types", {
+  id: serial("id").primaryKey(),
+  trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+  nome: text("nome").notNull(),
+  descrizione: text("descrizione"),
+  durata_minuti: integer("durata_minuti").notNull(),
+  colore_hex: text("colore_hex").default("#3b82f6").notNull(),
+  prezzo_centesimi: integer("prezzo_centesimi"),
+  /** 'online' | 'in_presenza' | 'entrambi' */
+  modalita: text("modalita").default("in_presenza").notNull(),
+  is_active: boolean("is_active").default(true).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── Availability Rules (orari ricorrenti settimanali del trainer) ──
+export const availability_rules = pgTable(
+  "availability_rules",
+  {
+    id: serial("id").primaryKey(),
+    trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+    giorno_settimana: integer("giorno_settimana").notNull(), // 1=Lun … 7=Dom
+    start_time: text("start_time").notNull(), // "HH:MM"
+    end_time: text("end_time").notNull(),     // "HH:MM"
+    is_active: boolean("is_active").default(true).notNull(),
+  },
+  (t) => ({
+    trainerDayIdx: index("availability_rules_trainer_day_idx").on(
+      t.trainer_id,
+      t.giorno_settimana
+    ),
+  })
+);
+
+// ─── Availability Overrides (eccezioni: ferie / orari speciali) ────
+// tipo: 'blocked' = giornata o fascia bloccata
+//       'custom'  = fascia oraria personalizzata (sostituisce le rules per quel giorno)
+export const availability_overrides = pgTable(
+  "availability_overrides",
+  {
+    id: serial("id").primaryKey(),
+    trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+    data: date("data").notNull(),
+    tipo: text("tipo").notNull(), // 'blocked' | 'custom'
+    start_time: text("start_time"), // null = blocco intera giornata
+    end_time: text("end_time"),
+    motivo: text("motivo"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    trainerDateIdx: index("availability_overrides_trainer_date_idx").on(
+      t.trainer_id,
+      t.data
+    ),
+  })
+);
+
+// ─── Appointments (prenotazioni cliente↔trainer) ────────────────────
+// status: 'pending' | 'confirmed' | 'completed' |
+//         'cancelled_client' | 'cancelled_trainer' | 'no_show'
+export const appointments = pgTable(
+  "appointments",
+  {
+    id: serial("id").primaryKey(),
+    trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+    client_id: integer("client_id").references(() => clients.id, { onDelete: 'cascade' }).notNull(),
+    appointment_type_id: integer("appointment_type_id")
+      .references(() => appointment_types.id, { onDelete: 'set null' }),
+    start_at: timestamp("start_at").notNull(),
+    end_at: timestamp("end_at").notNull(),
+    status: text("status").default("pending").notNull(),
+    /** 'online' | 'in_presenza' (snapshot al momento della prenotazione) */
+    modalita: text("modalita").default("in_presenza").notNull(),
+    cliente_note: text("cliente_note"),
+    trainer_note: text("trainer_note"),
+    cancelled_reason: text("cancelled_reason"),
+    confirmed_at: timestamp("confirmed_at"),
+    cancelled_at: timestamp("cancelled_at"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    trainerStartIdx: index("appointments_trainer_start_idx").on(
+      t.trainer_id,
+      t.start_at
+    ),
+    clientStartIdx: index("appointments_client_start_idx").on(
+      t.client_id,
+      t.start_at
+    ),
+    statusIdx: index("appointments_status_idx").on(t.status),
+  })
+);
+
+// ─── Questionnaire templates ──────────────────────────────────────
+// tipo: 'check_rinnovo' | 'anamnesi' | 'feedback' | 'generico'
+// schema_json: { questions: [{ id, type, label, required, options?, ... }] }
+export const questionnaire_templates = pgTable("questionnaire_templates", {
+  id: serial("id").primaryKey(),
+  trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+  nome: text("nome").notNull(),
+  tipo: text("tipo").default("generico").notNull(),
+  descrizione: text("descrizione"),
+  schema_json: jsonb("schema_json").notNull(),
+  is_active: boolean("is_active").default(true).notNull(),
+  created_at: timestamp("created_at").defaultNow().notNull(),
+  updated_at: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// ─── Questionnaire assignments (cliente ↔ template) ───────────────
+// status: 'pending' | 'completed' | 'expired'
+export const questionnaire_assignments = pgTable(
+  "questionnaire_assignments",
+  {
+    id: serial("id").primaryKey(),
+    template_id: integer("template_id")
+      .references(() => questionnaire_templates.id, { onDelete: 'cascade' })
+      .notNull(),
+    client_id: integer("client_id")
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
+    trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+    status: text("status").default("pending").notNull(),
+    motivo: text("motivo"), // es. "Scadenza abbonamento 02-03-2026"
+    sent_at: timestamp("sent_at").defaultNow().notNull(),
+    completed_at: timestamp("completed_at"),
+    reminder_sent_at: timestamp("reminder_sent_at"),
+    /** Riferimento opzionale a una subscription per evitare doppioni nel cron */
+    subscription_id: integer("subscription_id").references(
+      () => subscriptions.id,
+      { onDelete: 'set null' }
+    ),
+  },
+  (t) => ({
+    clientStatusIdx: index("questionnaire_assignments_client_status_idx").on(
+      t.client_id,
+      t.status
+    ),
+    trainerStatusIdx: index("questionnaire_assignments_trainer_status_idx").on(
+      t.trainer_id,
+      t.status
+    ),
+  })
+);
+
+// ─── Questionnaire responses ──────────────────────────────────────
+// response_json: { [questionId]: answer }
+export const questionnaire_responses = pgTable("questionnaire_responses", {
+  id: serial("id").primaryKey(),
+  assignment_id: integer("assignment_id")
+    .references(() => questionnaire_assignments.id, { onDelete: 'cascade' })
+    .notNull()
+    .unique(),
+  response_json: jsonb("response_json").notNull(),
+  submitted_at: timestamp("submitted_at").defaultNow().notNull(),
+});
+
+// ─── Chat messages (trainer ↔ cliente) ─────────────────────────────
+// sender_role: 'trainer' | 'client'
+export const chat_messages = pgTable(
+  "chat_messages",
+  {
+    id: serial("id").primaryKey(),
+    trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+    client_id: integer("client_id")
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
+    sender_role: text("sender_role").notNull(),
+    body: text("body").notNull(),
+    attachment_r2_key: text("attachment_r2_key"),
+    attachment_mime_type: text("attachment_mime_type"),
+    read_at: timestamp("read_at"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    conversationIdx: index("chat_messages_conversation_idx").on(
+      t.trainer_id,
+      t.client_id,
+      t.created_at
+    ),
+    unreadIdx: index("chat_messages_unread_idx").on(
+      t.client_id,
+      t.read_at,
+      t.sender_role
+    ),
+  })
+);
 
 // ─── Client Password Reset Tokens ───────────────────────
 export const client_password_reset_tokens = pgTable("client_password_reset_tokens", {

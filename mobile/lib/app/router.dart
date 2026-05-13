@@ -2,16 +2,26 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/altro/presentation/altro_page.dart';
 import '../features/announcements/presentation/announcements_page.dart';
+import '../features/bookings/presentation/bookings_list_page.dart';
+import '../features/bookings/presentation/new_booking_page.dart';
 import '../features/auth/presentation/auth_controller.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/splash_page.dart';
+import '../features/chat/presentation/chat_page.dart';
 import '../features/documents/presentation/documents_page.dart';
 import '../features/home/presentation/home_page.dart';
 import '../features/home/presentation/main_shell.dart';
+import '../features/nutrition/presentation/nutrition_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
+import '../features/packages/presentation/packages_page.dart';
+import '../features/privacy/presentation/privacy_data_page.dart';
+import '../features/questionnaires/presentation/questionnaire_form_page.dart';
+import '../features/questionnaires/presentation/questionnaires_list_page.dart';
 import '../features/profile/presentation/profile_page.dart';
 import '../features/progress/presentation/progress_page.dart';
+import '../features/subscriptions/presentation/subscriptions_page.dart';
 import '../features/workouts/presentation/assignment_detail_page.dart';
 import '../features/workouts/presentation/assignments_list_page.dart';
 import '../features/workouts/presentation/session_player_page.dart';
@@ -72,14 +82,19 @@ final routerProvider = Provider<GoRouter>((ref) {
                 const NoTransitionPage(child: AssignmentsListPage()),
           ),
           GoRoute(
+            path: '/nutrition',
+            pageBuilder: (context, state) =>
+                const NoTransitionPage(child: NutritionPage()),
+          ),
+          GoRoute(
             path: '/progress',
             pageBuilder: (context, state) =>
                 const NoTransitionPage(child: ProgressPage()),
           ),
           GoRoute(
-            path: '/profile',
+            path: '/altro',
             pageBuilder: (context, state) =>
-                const NoTransitionPage(child: ProfilePage()),
+                const NoTransitionPage(child: AltroPage()),
           ),
         ],
       ),
@@ -115,6 +130,49 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/announcements',
         builder: (context, state) => const AnnouncementsPage(),
+      ),
+      GoRoute(
+        path: '/packages',
+        builder: (context, state) => const PackagesPage(),
+      ),
+      GoRoute(
+        path: '/subscriptions',
+        builder: (context, state) => const SubscriptionsPage(),
+      ),
+      GoRoute(
+        path: '/bookings',
+        builder: (context, state) => const BookingsListPage(),
+        routes: [
+          GoRoute(
+            path: 'new',
+            builder: (context, state) => const NewBookingPage(),
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/questionnaires',
+        builder: (context, state) => const QuestionnairesListPage(),
+        routes: [
+          GoRoute(
+            path: ':id',
+            builder: (context, state) {
+              final id = int.parse(state.pathParameters['id']!);
+              return QuestionnaireFormPage(assignmentId: id);
+            },
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfilePage(),
+      ),
+      GoRoute(
+        path: '/privacy',
+        builder: (context, state) => const PrivacyDataPage(),
+      ),
+      GoRoute(
+        path: '/chat',
+        builder: (context, state) => const ChatPage(),
       ),
     ],
   );

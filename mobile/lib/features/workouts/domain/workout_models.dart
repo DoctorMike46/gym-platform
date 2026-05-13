@@ -255,20 +255,71 @@ class SessionExerciseLogRow {
     required this.exerciseLog,
     this.templateExercise,
     this.exercise,
+    this.attachments = const [],
   });
 
   final WorkoutExerciseLog exerciseLog;
   final WorkoutTemplateExercise? templateExercise;
   final Exercise? exercise;
+  final List<WorkoutAttachment> attachments;
 
   factory SessionExerciseLogRow.fromJson(Map<String, dynamic> json) {
     final te = json['templateExercise'];
     final ex = json['exercise'];
+    final atts = json['attachments'];
     return SessionExerciseLogRow(
       exerciseLog: WorkoutExerciseLog.fromJson(json['exerciseLog'] as Map<String, dynamic>),
       templateExercise:
           te is Map<String, dynamic> ? WorkoutTemplateExercise.fromJson(te) : null,
       exercise: ex is Map<String, dynamic> ? Exercise.fromJson(ex) : null,
+      attachments: atts is List
+          ? atts
+              .whereType<Map<String, dynamic>>()
+              .map(WorkoutAttachment.fromJson)
+              .toList()
+          : const [],
+    );
+  }
+}
+
+/// Allegato (foto/video) di un exercise log.
+class WorkoutAttachment {
+  const WorkoutAttachment({
+    required this.id,
+    required this.exerciseLogId,
+    required this.r2Key,
+    required this.mimeType,
+    required this.kind,
+    required this.uploadedAt,
+    this.filename,
+    this.sizeBytes,
+    this.durationSeconds,
+  });
+
+  final int id;
+  final int exerciseLogId;
+  final String r2Key;
+  final String mimeType;
+  final String kind; // 'image' | 'video'
+  final String? filename;
+  final int? sizeBytes;
+  final int? durationSeconds;
+  final DateTime uploadedAt;
+
+  bool get isImage => kind == 'image';
+  bool get isVideo => kind == 'video';
+
+  factory WorkoutAttachment.fromJson(Map<String, dynamic> json) {
+    return WorkoutAttachment(
+      id: (json['id'] as num).toInt(),
+      exerciseLogId: (json['exercise_log_id'] as num).toInt(),
+      r2Key: json['r2_key'] as String,
+      mimeType: json['mime_type'] as String,
+      kind: json['kind'] as String,
+      filename: json['filename'] as String?,
+      sizeBytes: (json['size_bytes'] as num?)?.toInt(),
+      durationSeconds: (json['duration_seconds'] as num?)?.toInt(),
+      uploadedAt: DateTime.parse(json['uploaded_at'] as String).toLocal(),
     );
   }
 }

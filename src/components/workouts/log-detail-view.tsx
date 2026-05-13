@@ -1,7 +1,18 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Dumbbell, Activity, MessageSquare, User } from "lucide-react";
-import type { WorkoutLogDetail } from "@/lib/types/workout-log-detail";
+import {
+    Clock,
+    Dumbbell,
+    Activity,
+    MessageSquare,
+    User,
+    Paperclip,
+    Play,
+} from "lucide-react";
+import type {
+    WorkoutLogDetail,
+    WorkoutLogAttachment,
+} from "@/lib/types/workout-log-detail";
 
 interface LogDetailViewProps {
     data: WorkoutLogDetail;
@@ -195,8 +206,67 @@ function ExerciseLogCard({
                         “{exerciseLog.note}”
                     </p>
                 )}
+
+                {row.attachments && row.attachments.length > 0 && (
+                    <AttachmentsGrid attachments={row.attachments} />
+                )}
             </CardContent>
         </Card>
+    );
+}
+
+function AttachmentsGrid({ attachments }: { attachments: WorkoutLogAttachment[] }) {
+    return (
+        <div>
+            <div className="flex items-center gap-1.5 mb-1.5">
+                <Paperclip size={12} className="text-slate-400" />
+                <span className="text-[10px] uppercase tracking-wide text-slate-500 font-bold">
+                    Allegati del cliente ({attachments.length})
+                </span>
+            </div>
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
+                {attachments.map((a) => (
+                    <AttachmentThumb key={a.id} attachment={a} />
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function AttachmentThumb({ attachment }: { attachment: WorkoutLogAttachment }) {
+    const url = `/api/media/workout-attachment?key=${encodeURIComponent(attachment.r2_key)}`;
+    if (attachment.kind === "video") {
+        return (
+            <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="aspect-square relative rounded-md bg-slate-900 text-white flex items-center justify-center hover:opacity-90 transition"
+                title={attachment.filename ?? "Video"}
+            >
+                <Play size={24} />
+                <span className="absolute bottom-1 left-1 text-[9px] font-bold bg-black/60 px-1 rounded">
+                    VIDEO
+                </span>
+            </a>
+        );
+    }
+    return (
+        <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="aspect-square block rounded-md overflow-hidden border border-slate-200 hover:border-slate-300 transition bg-slate-100"
+            title={attachment.filename ?? "Foto"}
+        >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+                src={url}
+                alt={attachment.filename ?? "Allegato"}
+                className="w-full h-full object-cover"
+                loading="lazy"
+            />
+        </a>
     );
 }
 

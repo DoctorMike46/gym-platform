@@ -14,6 +14,8 @@ class ClientStats {
     required this.weightChange30d,
     required this.volumeThisWeek,
     required this.activeAssignments,
+    required this.weeklySplitTarget,
+    required this.weeklyWorkoutDates,
     required this.nextSuggested,
   });
 
@@ -25,6 +27,9 @@ class ClientStats {
   final double? weightChange30d;
   final int volumeThisWeek;
   final int activeAssignments;
+  final int? weeklySplitTarget;
+  /// Date YYYY-MM-DD distinte degli ultimi 7 giorni con almeno un workout completato.
+  final Set<String> weeklyWorkoutDates;
   final NextSuggestedSession? nextSuggested;
 
   factory ClientStats.fromJson(Map<String, dynamic> json) {
@@ -34,6 +39,7 @@ class ClientStats {
     }
 
     final next = json['next_suggested'];
+    final dates = (json['weekly_workout_dates'] as List<dynamic>?) ?? const [];
     return ClientStats(
       workoutsThisWeek: (json['workouts_this_week'] as num?)?.toInt() ?? 0,
       workoutsThisMonth: (json['workouts_this_month'] as num?)?.toInt() ?? 0,
@@ -43,6 +49,8 @@ class ClientStats {
       weightChange30d: (json['weight_change_30d'] as num?)?.toDouble(),
       volumeThisWeek: (json['volume_this_week'] as num?)?.toInt() ?? 0,
       activeAssignments: (json['active_assignments'] as num?)?.toInt() ?? 0,
+      weeklySplitTarget: (json['weekly_split_target'] as num?)?.toInt(),
+      weeklyWorkoutDates: dates.map((e) => e.toString()).toSet(),
       nextSuggested: next is Map<String, dynamic>
           ? NextSuggestedSession.fromJson(next)
           : null,
