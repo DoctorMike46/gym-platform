@@ -756,3 +756,32 @@ export const documentsRelations = relations(documents, ({ one }) => ({
   trainer: one(trainers, { fields: [documents.trainer_id], references: [trainers.id] }),
   client: one(clients, { fields: [documents.client_id], references: [clients.id] }),
 }));
+
+// ─── Audit Logs (GDPR art.9 — tracciamento accessi a dati sanitari) ──
+// actor_type: 'trainer' | 'client' | 'system'
+// action: namespaced, es. 'health.read', 'health.write', 'measurement.read',
+//         'photo.read', 'gdpr.export', 'gdpr.delete'
+// client_id: SEMPRE valorizzato quando l'azione riguarda dati di un cliente,
+//            così si può rispondere a un'istanza art.15 (chi ha visto i miei dati?)
+//            con una singola query indicizzata.
+export const audit_logs = pgTable(
+  "audit_logs",
+  {
+    id: serial("id").primaryKey(),
+    actor_type: text("actor_type").notNull(),
+    actor_id: integer("actor_id"),
+    action: text("action").notNull(),
+    resource_type: text("resource_type").notNull(),
+    resource_id: integer("resource_id"),
+    client_id: integer("client_id"),
+    metadata: jsonb("metadata"),
+    ip_address: text("ip_address"),
+    user_agent: text("user_agent"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    actorIdx: index("audit_logs_actor_idx").on(t.actor_type, t.actor_id, t.created_at),
+    clientIdx: index("audit_logs_client_idx").on(t.client_id, t.created_at),
+    actionIdx: index("audit_logs_action_idx").on(t.action, t.created_at),
+  })
+);

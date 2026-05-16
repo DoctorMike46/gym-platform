@@ -5,6 +5,7 @@ import { clients } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { jsonError, jsonOk, requireApiClientAuth } from "@/lib/api-auth";
 import { deleteClientAccount } from "@/lib/services/account-gdpr.service";
+import { logAudit } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 
@@ -64,6 +65,17 @@ export async function DELETE(req: NextRequest) {
 
     try {
         const result = await deleteClientAccount(auth.session.id);
+        await logAudit({
+            actor: { type: "client", id: auth.session.id },
+            action: "gdpr.delete",
+            resourceType: "client_account",
+            clientId: auth.session.id,
+            metadata: {
+                r2_objects_deleted: result.deleted_objects,
+                r2_objects_failed: result.failed_objects,
+            },
+            request: req,
+        });
         return jsonOk({
             deleted: true,
             r2_objects_deleted: result.deleted_objects,

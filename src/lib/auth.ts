@@ -7,14 +7,14 @@ import { eq } from "drizzle-orm";
 
 function getJwtSecret(): Uint8Array {
     const s = process.env.JWT_SECRET;
-    if (!s || s.length < 32) {
-        if (process.env.NODE_ENV === "production") {
-            throw new Error("JWT_SECRET must be set and >=32 chars in production");
-        }
-        console.warn("Using fallback dev JWT secret — DO NOT deploy this way");
-        return new TextEncoder().encode("dev-secret-change-in-production-32ch");
+    if (s && s.length >= 32) {
+        return new TextEncoder().encode(s);
     }
-    return new TextEncoder().encode(s);
+    if (process.env.NODE_ENV !== "development") {
+        throw new Error("JWT_SECRET must be set to a value of at least 32 characters outside of development");
+    }
+    console.warn("[auth] JWT_SECRET missing in development — generating an ephemeral random secret. Tokens will not survive process restart.");
+    return crypto.getRandomValues(new Uint8Array(32));
 }
 
 const JWT_SECRET = getJwtSecret();

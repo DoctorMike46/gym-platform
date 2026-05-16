@@ -14,6 +14,7 @@ import {
 import { eq, and, desc, asc } from "drizzle-orm";
 import { getAuthenticatedTrainer } from "@/lib/auth";
 import { getR2SignedUrl } from "@/lib/r2";
+import { logAudit } from "@/lib/audit-log";
 import { revalidatePath } from "next/cache";
 
 async function ensureTrainerOwnsClient(clientId: number) {
@@ -136,21 +137,37 @@ async function loadLogDetail(
 }
 
 export async function getClientMeasurements(clientId: number) {
-    await ensureTrainerOwnsClient(clientId);
-    return db
+    const trainer = await ensureTrainerOwnsClient(clientId);
+    const rows = await db
         .select()
         .from(body_measurements)
         .where(eq(body_measurements.client_id, clientId))
         .orderBy(desc(body_measurements.date));
+    await logAudit({
+        actor: { type: "trainer", id: trainer.id },
+        action: "measurement.read",
+        resourceType: "body_measurements",
+        clientId,
+        metadata: { returned: rows.length },
+    });
+    return rows;
 }
 
 export async function getClientProgressPhotos(clientId: number) {
-    await ensureTrainerOwnsClient(clientId);
-    return db
+    const trainer = await ensureTrainerOwnsClient(clientId);
+    const rows = await db
         .select()
         .from(progress_photos)
         .where(eq(progress_photos.client_id, clientId))
         .orderBy(desc(progress_photos.date));
+    await logAudit({
+        actor: { type: "trainer", id: trainer.id },
+        action: "photo.read",
+        resourceType: "progress_photos",
+        clientId,
+        metadata: { returned: rows.length },
+    });
+    return rows;
 }
 
 export async function getClientProgressPhotoUrl(photoId: number) {
@@ -169,5 +186,14 @@ export async function getClientProgressPhotoUrl(photoId: number) {
         .limit(1);
     if (!client || client.trainer_id !== trainer.id) throw new Error("Non autorizzato");
 
-    return getR2SignedUrl(photo.r2_key);
+    const url = await getR2SignedUrl(photo.r2_key);
+    await logAudit({
+        actor: { type: "trainer", id: trainer.id },
+        action: "photo.read",
+        resourceType: "progress_photos",
+        resourceId: photo.id,
+        clientId: photo.client_id,
+        metadata: { r2_key: photo.r2_key, signed_url_issued: true },
+    });
+    return url;
 }

@@ -6,6 +6,7 @@ import {
     HEALTH_SAMPLE_TYPES,
     type HealthSampleType,
 } from "@/lib/services/health-samples.service";
+import { logAudit } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 
@@ -38,6 +39,15 @@ export async function GET(req: NextRequest) {
         ),
         listLatestHealthSamples(auth.session.id),
     ]);
+
+    await logAudit({
+        actor: { type: "client", id: auth.session.id },
+        action: "health.read",
+        resourceType: "client_health_samples",
+        clientId: auth.session.id,
+        metadata: { days, types, returned: samples.length },
+        request: req,
+    });
 
     return jsonOk({ samples, latest });
 }

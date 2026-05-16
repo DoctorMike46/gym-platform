@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jsonError, requireApiClientAuth } from "@/lib/api-auth";
 import { exportClientData } from "@/lib/services/account-gdpr.service";
+import { logAudit } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 
@@ -22,6 +23,14 @@ export async function GET(req: NextRequest) {
         if (!data) {
             return jsonError("not_found", "Profilo non trovato", 404);
         }
+
+        await logAudit({
+            actor: { type: "client", id: auth.session.id },
+            action: "gdpr.export",
+            resourceType: "client_account",
+            clientId: auth.session.id,
+            request: req,
+        });
 
         const today = new Date().toISOString().slice(0, 10);
         const filename = `dati-personali-${auth.session.id}-${today}.json`;

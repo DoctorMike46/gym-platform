@@ -19,8 +19,9 @@ const noopLimiter: Limiter = {
 function build(prefix: string, limit: number, windowSec: number): Limiter {
     if (!url || !token) {
         if (process.env.NODE_ENV === "production") {
-            console.warn(`[rate-limit] Upstash env not set — '${prefix}' running without limits.`);
+            throw new Error(`[rate-limit] UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN must be set in production (limiter: '${prefix}')`);
         }
+        console.warn(`[rate-limit] Upstash env not set — '${prefix}' running without limits (non-production).`);
         return noopLimiter;
     }
 

@@ -4,6 +4,7 @@ import {
     insertHealthSamples,
     type IncomingSample,
 } from "@/lib/services/health-samples.service";
+import { logAudit } from "@/lib/audit-log";
 
 export const runtime = "nodejs";
 
@@ -35,5 +36,18 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await insertHealthSamples(auth.session.id, body.samples);
+
+    await logAudit({
+        actor: { type: "client", id: auth.session.id },
+        action: "health.write",
+        resourceType: "client_health_samples",
+        clientId: auth.session.id,
+        metadata: {
+            received: body.samples.length,
+            inserted: result.inserted,
+        },
+        request: req,
+    });
+
     return jsonOk({ inserted: result.inserted, total_received: body.samples.length });
 }
