@@ -189,6 +189,9 @@ export const announcement_recipients = pgTable("announcement_recipients", {
 });
 
 // ─── Body Measurements (client portal) ──────────────────
+// Le colonne `*_enc` sono shadow GDPR art.9 (vedi src/lib/crypto.ts).
+// Durante la migrazione H4 si fa dual-write/dual-read; al termine le
+// plain verranno droppate.
 export const body_measurements = pgTable("body_measurements", {
   id: serial("id").primaryKey(),
   client_id: integer("client_id").references(() => clients.id, { onDelete: 'cascade' }).notNull(),
@@ -200,6 +203,14 @@ export const body_measurements = pgTable("body_measurements", {
   petto_cm: text("petto_cm"),
   braccio_cm: text("braccio_cm"),
   coscia_cm: text("coscia_cm"),
+  // Shadow columns cifrate (H4)
+  peso_kg_enc: text("peso_kg_enc"),
+  body_fat_pct_enc: text("body_fat_pct_enc"),
+  vita_cm_enc: text("vita_cm_enc"),
+  fianchi_cm_enc: text("fianchi_cm_enc"),
+  petto_cm_enc: text("petto_cm_enc"),
+  braccio_cm_enc: text("braccio_cm_enc"),
+  coscia_cm_enc: text("coscia_cm_enc"),
   note: text("note"),
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
@@ -217,6 +228,8 @@ export const client_health_samples = pgTable(
       .notNull(),
     type: text("type").notNull(),
     value: text("value").notNull(),
+    // Shadow column cifrata GDPR art.9 (H4) — vedi src/lib/crypto.ts
+    value_enc: text("value_enc"),
     unit: text("unit").notNull(),
     recorded_at: timestamp("recorded_at").notNull(),
     source: text("source").notNull(),
