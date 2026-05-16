@@ -204,6 +204,40 @@ export const body_measurements = pgTable("body_measurements", {
   created_at: timestamp("created_at").defaultNow().notNull(),
 });
 
+// ─── Client Health Samples (sync da Apple HealthKit / Health Connect) ──
+// Granulare: una riga per ogni misurazione/timestamp/tipo.
+// type: 'weight' | 'steps' | 'heart_rate_resting' | 'active_energy' | 'sleep_hours' | 'workout_minutes'
+// source: 'apple_health' | 'health_connect' | 'manual'
+export const client_health_samples = pgTable(
+  "client_health_samples",
+  {
+    id: serial("id").primaryKey(),
+    client_id: integer("client_id")
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
+    type: text("type").notNull(),
+    value: text("value").notNull(),
+    unit: text("unit").notNull(),
+    recorded_at: timestamp("recorded_at").notNull(),
+    source: text("source").notNull(),
+    synced_at: timestamp("synced_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    clientTypeIdx: index("client_health_samples_client_type_idx").on(
+      t.client_id,
+      t.type,
+      t.recorded_at
+    ),
+    // Evita duplicati al re-sync (stesso campione, stesso tipo, stessa fonte, stesso timestamp)
+    dedupIdx: uniqueIndex("client_health_samples_dedup_idx").on(
+      t.client_id,
+      t.type,
+      t.source,
+      t.recorded_at
+    ),
+  })
+);
+
 // ─── Progress Photos ────────────────────────────────────
 export const progress_photos = pgTable("progress_photos", {
   id: serial("id").primaryKey(),

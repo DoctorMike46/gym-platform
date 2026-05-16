@@ -10,6 +10,7 @@ import '../../../core/widgets/branding_logo.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/presentation/auth_controller.dart';
+import '../../health/presentation/health_card.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -133,6 +134,10 @@ class ProfilePage extends ConsumerWidget {
             title: 'Cambia password',
             onTap: () => _showChangePassword(context, ref),
           ),
+
+          const SizedBox(height: 16),
+          _SectionTitle(title: 'Salute'),
+          const HealthBiometricsCard(),
 
           const SizedBox(height: 16),
           _SectionTitle(title: 'Privacy e dati'),

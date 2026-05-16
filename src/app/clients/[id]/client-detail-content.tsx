@@ -38,6 +38,7 @@ import { getSettings } from "@/lib/actions/settings";
 import { generateWorkoutPDF } from "@/lib/pdf-generator";
 import { uploadDocument } from "@/lib/actions/documents";
 import { PortalAccessCard } from "@/components/clients/portal-access-card";
+import { ClientHealthCard } from "@/components/clients/health-card";
 import { toast } from "sonner";
 
 export default function ClientDetailContent({
@@ -292,6 +293,9 @@ export default function ClientDetailContent({
                                 </div>
                             </CardContent>
                         </Card>
+
+                        {/* Salute & biometria (sync da Apple Health / Health Connect) */}
+                        <ClientHealthCard clientId={client.id} />
 
                         {/* Schede di Allenamento */}
                         <Card className="bg-white border-slate-200 shadow-sm">
