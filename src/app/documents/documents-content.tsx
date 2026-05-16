@@ -50,6 +50,9 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Pagination } from "@/components/ui/pagination";
+
+const CLIENTS_DEFAULT_PAGE_SIZE = 10;
 
 interface Client {
     id: number;
@@ -95,6 +98,11 @@ export default function DocumentsContent({
     const [loading, setLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState("");
     const [confirmDelete, setConfirmDelete] = useState<number | null>(null);
+
+    // Filtri lista clienti (vista 1)
+    const [filterDocsCount, setFilterDocsCount] = useState<"all" | "with" | "without">("all");
+    const [clientsPage, setClientsPage] = useState(1);
+    const [clientsPageSize, setClientsPageSize] = useState(CLIENTS_DEFAULT_PAGE_SIZE);
 
     // Upload form state
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -182,11 +190,28 @@ export default function DocumentsContent({
     }
 
     const filteredClients = useMemo(() => {
-        return clientsData.filter(c =>
-            `${c.nome} ${c.cognome}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            c.email.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [clientsData, searchTerm]);
+        return clientsData.filter(c => {
+            const matchesSearch =
+                `${c.nome} ${c.cognome}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                c.email.toLowerCase().includes(searchTerm.toLowerCase());
+            if (!matchesSearch) return false;
+            if (filterDocsCount === "all") return true;
+            const count = documentsData.filter(d => d.client_id === c.id).length;
+            return filterDocsCount === "with" ? count > 0 : count === 0;
+        });
+    }, [clientsData, documentsData, searchTerm, filterDocsCount]);
+
+    const clientsFiltersKey = `${searchTerm}|${filterDocsCount}`;
+    const [prevClientsFiltersKey, setPrevClientsFiltersKey] = useState(clientsFiltersKey);
+    if (prevClientsFiltersKey !== clientsFiltersKey) {
+        setClientsPage(1);
+        setPrevClientsFiltersKey(clientsFiltersKey);
+    }
+
+    const pagedClients = useMemo(
+        () => filteredClients.slice((clientsPage - 1) * clientsPageSize, clientsPage * clientsPageSize),
+        [filteredClients, clientsPage, clientsPageSize],
+    );
 
     const filteredDocs = useMemo(() => {
         return documentsData.filter(doc => {
@@ -294,16 +319,48 @@ export default function DocumentsContent({
                 </div>
 
                 {/* Filters/Search Bar */}
-                <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
+                <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center gap-3">
                     <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
                         <Input
-                            placeholder={view === 'clients' ? "Cerca cliente..." : "Cerca file..."}
+                            placeholder={view === 'clients' ? "Cerca per nome, cognome o email..." : "Cerca file..."}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10 bg-slate-50 border-slate-200 rounded-xl focus:ring-brand-500"
+                            className="pl-10 bg-slate-50 border-slate-200 rounded-xl focus:ring-brand-500 h-10"
                         />
                     </div>
+                    {view === 'clients' && (
+                        <div className="flex gap-3">
+                            <Select value={filterDocsCount} onValueChange={(v) => setFilterDocsCount(v as "all" | "with" | "without")}>
+                                <SelectTrigger className="w-full md:w-[200px] border-slate-200 shadow-none h-10 bg-slate-50 rounded-xl">
+                                    <SelectValue placeholder="Documenti" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">Tutti i clienti</SelectItem>
+                                    <SelectItem value="with">Con documenti</SelectItem>
+                                    <SelectItem value="without">Senza documenti</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            {(searchTerm || filterDocsCount !== "all") && (
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-10 w-10 text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex-shrink-0"
+                                            onClick={() => {
+                                                setSearchTerm("");
+                                                setFilterDocsCount("all");
+                                            }}
+                                        >
+                                            <FilterX size={18} />
+                                        </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>Resetta filtri</TooltipContent>
+                                </Tooltip>
+                            )}
+                        </div>
+                    )}
                     {view !== 'clients' && (
                         <Button
                             variant="ghost"
@@ -327,33 +384,136 @@ export default function DocumentsContent({
                 {/* Main Content Area */}
                 <div className="min-h-[400px]">
                     {view === 'clients' && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                            {filteredClients.map(client => (
-                                <button
-                                    key={client.id}
-                                    onClick={() => { setSelectedClient(client); setView('folders'); }}
-                                    className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm hover:border-brand-300 hover:shadow-md transition-all text-left group"
-                                >
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 group-hover:bg-brand-50 group-hover:text-brand-600 transition-colors">
-                                            <User size={24} />
-                                        </div>
-                                        <Badge variant="secondary" className="bg-slate-100 text-slate-500 border-none">
-                                            {stats[client.id] || 0} file
-                                        </Badge>
+                        <div className="space-y-4">
+                            {/* Desktop: tabella */}
+                            <div className="hidden md:block rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden overflow-x-auto">
+                                <Table>
+                                    <TableHeader className="bg-slate-50">
+                                        <TableRow className="hover:bg-slate-50 border-slate-200">
+                                            <TableHead className="text-slate-700 font-semibold">Cliente</TableHead>
+                                            <TableHead className="text-slate-700 font-semibold">Documenti</TableHead>
+                                            <TableHead className="text-center text-slate-700 font-semibold w-[120px]">Azioni</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredClients.length === 0 && (
+                                            <TableRow>
+                                                <TableCell colSpan={3} className="text-center py-12 text-slate-500">
+                                                    {clientsData.length === 0
+                                                        ? "Nessun cliente registrato."
+                                                        : "Nessun cliente trovato con i filtri attuali."}
+                                                </TableCell>
+                                            </TableRow>
+                                        )}
+                                        {pagedClients.map((client) => {
+                                            const count = stats[client.id] || 0;
+                                            return (
+                                                <TableRow key={client.id} className="border-slate-200 hover:bg-slate-50/70 text-slate-800 group">
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center brand-text font-bold text-sm shrink-0">
+                                                                {(client.nome?.[0] ?? "?").toUpperCase()}
+                                                                {(client.cognome?.[0] ?? "").toUpperCase()}
+                                                            </div>
+                                                            <div className="flex flex-col">
+                                                                <span className="font-semibold brand-text">{client.nome} {client.cognome}</span>
+                                                                <span className="text-xs text-slate-400">{client.email}</span>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {count > 0 ? (
+                                                            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200 shadow-none">
+                                                                {count} file
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge variant="outline" className="text-slate-400 border-slate-200 shadow-none">
+                                                                Nessun documento
+                                                            </Badge>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center justify-center gap-1">
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-8 w-8 text-slate-500 hover:text-blue-600 hover:bg-blue-50"
+                                                                        onClick={() => { setSelectedClient(client); setView('folders'); }}
+                                                                    >
+                                                                        <FolderOpen size={15} />
+                                                                    </Button>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent>Apri cartelle</TooltipContent>
+                                                            </Tooltip>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </div>
+
+                            {/* Mobile: card list */}
+                            <div className="md:hidden space-y-2">
+                                {filteredClients.length === 0 ? (
+                                    <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+                                        {clientsData.length === 0
+                                            ? "Nessun cliente registrato."
+                                            : "Nessun cliente trovato con i filtri attuali."}
                                     </div>
-                                    <h3 className="font-bold text-slate-900 truncate">
-                                        {client.nome} {client.cognome}
-                                    </h3>
-                                    <p className="text-sm text-slate-400 truncate">{client.email}</p>
-                                </button>
-                            ))}
-                            {filteredClients.length === 0 && (
-                                <div className="col-span-full flex flex-col items-center justify-center py-20 text-slate-400">
-                                    <Search size={48} className="mb-4 opacity-20" />
-                                    <p>Nessun cliente trovato</p>
-                                </div>
-                            )}
+                                ) : (
+                                    pagedClients.map((client) => {
+                                        const count = stats[client.id] || 0;
+                                        return (
+                                            <button
+                                                key={client.id}
+                                                type="button"
+                                                onClick={() => { setSelectedClient(client); setView('folders'); }}
+                                                className="w-full text-left bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden px-4 py-3 hover:bg-slate-50 transition-colors flex items-center gap-3"
+                                            >
+                                                <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center brand-text font-bold text-sm shrink-0">
+                                                    {(client.nome?.[0] ?? "?").toUpperCase()}
+                                                    {(client.cognome?.[0] ?? "").toUpperCase()}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="font-semibold text-slate-900 truncate">
+                                                        {client.nome} {client.cognome}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500 truncate">
+                                                        {client.email}
+                                                    </div>
+                                                    <div className="mt-1">
+                                                        {count > 0 ? (
+                                                            <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 border-emerald-200 shadow-none text-[10px]">
+                                                                {count} file
+                                                            </Badge>
+                                                        ) : (
+                                                            <Badge variant="outline" className="text-slate-400 border-slate-200 shadow-none text-[10px]">
+                                                                Nessun documento
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <ChevronRight size={16} className="text-slate-300 shrink-0" />
+                                            </button>
+                                        );
+                                    })
+                                )}
+                            </div>
+
+                            <Pagination
+                                page={clientsPage}
+                                pageSize={clientsPageSize}
+                                total={filteredClients.length}
+                                onPageChange={setClientsPage}
+                                onPageSizeChange={(size) => {
+                                    setClientsPageSize(size);
+                                    setClientsPage(1);
+                                }}
+                            />
                         </div>
                     )}
 
