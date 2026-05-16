@@ -570,11 +570,33 @@ class SessionController extends StateNotifier<AsyncValue<SessionState>> {
 
   static int? _parseRecuperoSeconds(String? recupero) {
     if (recupero == null) return null;
-    final s = recupero.trim().toLowerCase();
+    var s = recupero.trim().toLowerCase();
     if (s.isEmpty) return null;
 
-    // Formati supportati: "60s", "90", "2 min", "1:30", "1' 30''", "1m30s"
-    // Caso "MM:SS" o "M:SS"
+    // Range "60-90s" o "1-2 min": prendiamo il valore minimo (l'utente
+    // può sempre estendere con +10s).
+    final dashIdx = s.indexOf(RegExp(r'[-–]'));
+    if (dashIdx > 0) {
+      final left = s.substring(0, dashIdx).trim();
+      final right = s.substring(dashIdx + 1).trim();
+      // Trasporta unità dal lato destro al sinistro se il sinistro è solo numero
+      // (es. "60-90s" → "60s" e "90s")
+      final unitMatch = RegExp(r'(min|minuti|sec|secondi|m|s)$').firstMatch(right);
+      if (unitMatch != null && RegExp(r'^[\d.,]+$').hasMatch(left)) {
+        s = '$left${unitMatch.group(0)}';
+      } else {
+        s = left;
+      }
+    }
+
+    // Normalizza decimali e unità lunghe
+    s = s
+        .replaceAll(',', '.')
+        .replaceAll('secondi', 's')
+        .replaceAll('sec', 's')
+        .replaceAll('minuti', 'min');
+
+    // MM:SS o M:SS
     final colon = RegExp(r'^(\d+):(\d{1,2})$').firstMatch(s);
     if (colon != null) {
       final m = int.parse(colon.group(1)!);
@@ -582,25 +604,25 @@ class SessionController extends StateNotifier<AsyncValue<SessionState>> {
       return m * 60 + sec;
     }
 
-    // Caso "Nmin" / "N min" / "N minuti"
-    final minMatch = RegExp(r'^(\d+)\s*(?:min|minuti|m)$').firstMatch(s);
+    // Minuti con decimali: "1.5 min", "2min", "2 m"
+    final minMatch = RegExp(r'^(\d+(?:\.\d+)?)\s*(?:min|m)$').firstMatch(s);
     if (minMatch != null) {
-      return int.parse(minMatch.group(1)!) * 60;
+      return (double.parse(minMatch.group(1)!) * 60).round();
     }
 
-    // Combinato "1m30s"
+    // Combinato "1m30s" / "1 min 30 s"
     final mixed = RegExp(r'^(\d+)\s*m(?:in)?\s*(\d+)\s*s$').firstMatch(s);
     if (mixed != null) {
       return int.parse(mixed.group(1)!) * 60 + int.parse(mixed.group(2)!);
     }
 
-    // Solo numero o "Ns"
-    final pure = RegExp(r'^(\d+)\s*s?$').firstMatch(s);
+    // Solo numero o "Ns" (con eventuali decimali)
+    final pure = RegExp(r'^(\d+(?:\.\d+)?)\s*s?$').firstMatch(s);
     if (pure != null) {
-      final n = int.parse(pure.group(1)!);
+      final n = double.parse(pure.group(1)!);
       // Se il valore è < 10 lo interpretiamo come minuti, altrimenti secondi
-      if (n < 10) return n * 60;
-      return n;
+      if (n < 10) return (n * 60).round();
+      return n.round();
     }
     return null;
   }

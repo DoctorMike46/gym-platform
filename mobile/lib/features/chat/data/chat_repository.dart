@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +9,17 @@ import '../../../core/config/env.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/storage/secure_storage.dart';
+
+class ChatAttachmentPresign {
+  ChatAttachmentPresign({
+    required this.uploadUrl,
+    required this.r2Key,
+    required this.headers,
+  });
+  final String uploadUrl;
+  final String r2Key;
+  final Map<String, String> headers;
+}
 
 class ChatMessage {
   const ChatMessage({
@@ -72,14 +84,89 @@ class ChatRepository {
   }
 
   /// Invia un messaggio. Ritorna il messaggio creato (con id assegnato).
-  Future<ChatMessage> sendMessage(String body) async {
+  Future<ChatMessage> sendMessage(
+    String body, {
+    String? attachmentR2Key,
+    String? attachmentMimeType,
+  }) async {
     try {
       final r = await _dio.post<Map<String, dynamic>>(
         '/api/v1/me/chat/messages',
-        data: {'body': body},
+        data: {
+          'body': body,
+          if (attachmentR2Key != null) 'attachment_r2_key': attachmentR2Key,
+          if (attachmentMimeType != null)
+            'attachment_mime_type': attachmentMimeType,
+        },
       );
       final data = r.data!['data'] as Map<String, dynamic>;
       return ChatMessage.fromJson(data['message'] as Map<String, dynamic>);
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// Richiede al server un URL PUT firmato per caricare un allegato su R2.
+  Future<ChatAttachmentPresign> presignAttachmentUpload({
+    required String filename,
+    required String contentType,
+    required int sizeBytes,
+  }) async {
+    try {
+      final r = await _dio.post<Map<String, dynamic>>(
+        '/api/v1/me/chat/attachments/presign',
+        data: {
+          'filename': filename,
+          'content_type': contentType,
+          'size_bytes': sizeBytes,
+        },
+      );
+      final data = r.data!['data'] as Map<String, dynamic>;
+      final headersRaw = (data['headers'] as Map<String, dynamic>?) ?? const {};
+      return ChatAttachmentPresign(
+        uploadUrl: data['upload_url'] as String,
+        r2Key: data['r2_key'] as String,
+        headers: headersRaw.map((k, v) => MapEntry(k, v.toString())),
+      );
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    }
+  }
+
+  /// Esegue PUT diretto del file binario su R2 con l'URL firmato.
+  Future<void> uploadAttachmentFile({
+    required String uploadUrl,
+    required Map<String, String> headers,
+    required File file,
+  }) async {
+    final raw = Dio();
+    try {
+      await raw.put<void>(
+        uploadUrl,
+        data: file.openRead(),
+        options: Options(
+          headers: {
+            ...headers,
+            Headers.contentLengthHeader: await file.length(),
+          },
+        ),
+      );
+    } on DioException catch (e) {
+      throw ApiException.fromDio(e);
+    } finally {
+      raw.close();
+    }
+  }
+
+  /// Ottiene URL firmato (GET, 1h) per visualizzare/scaricare un allegato.
+  Future<String> getAttachmentDownloadUrl(String r2Key) async {
+    try {
+      final r = await _dio.get<Map<String, dynamic>>(
+        '/api/v1/me/chat/attachments',
+        queryParameters: {'key': r2Key},
+      );
+      final data = r.data!['data'] as Map<String, dynamic>;
+      return data['url'] as String;
     } on DioException catch (e) {
       throw ApiException.fromDio(e);
     }

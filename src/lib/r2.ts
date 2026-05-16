@@ -152,3 +152,19 @@ export function generateWorkoutAttachmentKey(
     const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
     return `clients/${clientId}/workouts/${exerciseLogId}/${timestamp}_${sanitized}`;
 }
+
+/**
+ * Genera una chiave R2 per un allegato di chat tra trainer e cliente.
+ * Path: trainers/<trainerId>/clients/<clientId>/chat/<ts>_<filename>
+ * Sender è incluso solo a livello logico (la key viene generata dal server
+ * che riceve la richiesta — trainer o cliente — quindi l'auth è già verificata).
+ */
+export function generateChatAttachmentKey(
+    trainerId: number,
+    clientId: number,
+    fileName: string,
+): string {
+    const timestamp = Date.now();
+    const sanitized = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
+    return `trainers/${trainerId}/clients/${clientId}/chat/${timestamp}_${sanitized}`;
+}

@@ -7,6 +7,7 @@ import { TopBar } from "./top-bar";
 import { Toaster } from "@/components/ui/sonner";
 import { RegisterSW } from "@/components/pwa/register-sw";
 import { InstallPrompt } from "@/components/pwa/install-prompt";
+import { IdleTimeoutProvider } from "@/components/system/idle-timeout-provider";
 
 interface AppLayoutSettings {
     site_name?: string | null;
@@ -48,13 +49,15 @@ export function AppLayout({
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
-            <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} settings={settings} />
-            <TopBar settings={settings} counters={counters} />
-            <main className="flex-1 p-4 md:p-8 min-w-0">{children}</main>
-            <Toaster theme="light" />
-            <RegisterSW />
-            <InstallPrompt />
-        </div>
+        <IdleTimeoutProvider>
+            <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+                <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} settings={settings} />
+                <TopBar settings={settings} counters={counters} />
+                <main className="flex-1 p-4 md:p-8 min-w-0">{children}</main>
+                <Toaster theme="light" />
+                <RegisterSW />
+                <InstallPrompt />
+            </div>
+        </IdleTimeoutProvider>
     );
 }

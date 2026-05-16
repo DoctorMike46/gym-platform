@@ -11,6 +11,26 @@ import {
     markConversationRead,
 } from "@/lib/services/chat.service";
 import { sendPushToClient } from "@/lib/fcm";
+import {
+    generateChatAttachmentKey,
+    getR2SignedUploadUrl,
+    getR2SignedUrl,
+    uploadToR2,
+} from "@/lib/r2";
+
+const ALLOWED_CHAT_ATTACHMENT_TYPES = [
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+    "image/webp",
+    "image/heic",
+    "image/heif",
+    "application/pdf",
+    "video/mp4",
+    "video/quicktime",
+];
+
+const MAX_CHAT_ATTACHMENT_BYTES = 25 * 1024 * 1024;
 
 async function assertClientOwnership(trainerId: number, clientId: number) {
     const [c] = await db
@@ -229,4 +249,134 @@ export async function getLatestMessageIdForTrainer(clientId: number) {
         .orderBy(desc(chat_messages.id))
         .limit(1);
     return row?.id ?? 0;
+}
+
+/**
+ * Genera URL PUT firmato per caricare direttamente su R2 un allegato chat.
+ * Restituisce anche la `r2_key` da passare a `sendChatMessageFromTrainer`.
+ */
+export async function getChatAttachmentUploadUrl(params: {
+    clientId: number;
+    filename: string;
+    contentType: string;
+    sizeBytes?: number;
+}) {
+    const trainer = await getAuthenticatedTrainer();
+    try {
+        await assertClientOwnership(trainer.id, params.clientId);
+        if (!params.filename) {
+            return { success: false as const, error: "Filename richiesto" };
+        }
+        if (!ALLOWED_CHAT_ATTACHMENT_TYPES.includes(params.contentType)) {
+            return {
+                success: false as const,
+                error: "Tipo file non supportato (ammessi: immagini, PDF, video mp4/mov)",
+            };
+        }
+        if (
+            typeof params.sizeBytes === "number" &&
+            params.sizeBytes > MAX_CHAT_ATTACHMENT_BYTES
+        ) {
+            return {
+                success: false as const,
+                error: "File troppo grande (max 25MB)",
+            };
+        }
+
+        const key = generateChatAttachmentKey(
+            trainer.id,
+            params.clientId,
+            params.filename,
+        );
+        const url = await getR2SignedUploadUrl({
+            key,
+            contentType: params.contentType,
+            expiresIn: 600,
+        });
+
+        return {
+            success: true as const,
+            upload_url: url,
+            r2_key: key,
+            method: "PUT" as const,
+            headers: { "Content-Type": params.contentType },
+            expires_in: 600,
+        };
+    } catch (e) {
+        console.error("getChatAttachmentUploadUrl error:", e);
+        return { success: false as const, error: "Errore interno" };
+    }
+}
+
+/**
+ * Upload server-side di un allegato chat: il browser admin manda il file via
+ * server action (FormData) → Next.js lo inoltra a R2. Necessario perché R2
+ * non ha CORS configurato per il dominio admin (il PUT diretto dal browser
+ * fallisce con "Failed to fetch").
+ */
+export async function uploadChatAttachment(formData: FormData) {
+    const trainer = await getAuthenticatedTrainer();
+    try {
+        const clientIdRaw = formData.get("client_id");
+        const file = formData.get("file");
+        if (!clientIdRaw || !(file instanceof File)) {
+            return { success: false as const, error: "Parametri mancanti" };
+        }
+        const clientId = Number(clientIdRaw);
+        if (!Number.isFinite(clientId)) {
+            return { success: false as const, error: "client_id non valido" };
+        }
+        await assertClientOwnership(trainer.id, clientId);
+
+        const contentType = file.type || "application/octet-stream";
+        if (!ALLOWED_CHAT_ATTACHMENT_TYPES.includes(contentType)) {
+            return {
+                success: false as const,
+                error: "Tipo file non supportato (ammessi: immagini, PDF, video mp4/mov)",
+            };
+        }
+        if (file.size > MAX_CHAT_ATTACHMENT_BYTES) {
+            return {
+                success: false as const,
+                error: "File troppo grande (max 25MB)",
+            };
+        }
+
+        const key = generateChatAttachmentKey(
+            trainer.id,
+            clientId,
+            file.name || "attachment",
+        );
+        const buffer = Buffer.from(await file.arrayBuffer());
+        await uploadToR2({ key, body: buffer, contentType });
+
+        return {
+            success: true as const,
+            r2_key: key,
+            mime_type: contentType,
+        };
+    } catch (e) {
+        console.error("uploadChatAttachment error:", e);
+        return { success: false as const, error: "Errore upload" };
+    }
+}
+
+/**
+ * URL firmato (GET, 1h) per visualizzare/scaricare un allegato di una
+ * conversazione del trainer autenticato. Verifica che la key sia nel path
+ * `trainers/<trainerId>/clients/<clientId>/chat/…`.
+ */
+export async function getChatAttachmentDownloadUrl(r2Key: string) {
+    const trainer = await getAuthenticatedTrainer();
+    try {
+        const expectedPrefix = `trainers/${trainer.id}/clients/`;
+        if (!r2Key.startsWith(expectedPrefix) || !r2Key.includes("/chat/")) {
+            return { success: false as const, error: "Allegato non accessibile" };
+        }
+        const url = await getR2SignedUrl(r2Key);
+        return { success: true as const, url, expires_in: 3600 };
+    } catch (e) {
+        console.error("getChatAttachmentDownloadUrl error:", e);
+        return { success: false as const, error: "Errore interno" };
+    }
 }

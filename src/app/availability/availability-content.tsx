@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
 import {
     Dialog,
     DialogContent,
@@ -262,17 +263,10 @@ function TypesSection({ types }: { types: AppointmentType[] }) {
                                         <Pencil size={13} className="mr-1.5" />
                                         Modifica
                                     </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="text-rose-600 hover:bg-rose-50 h-8 ml-auto"
-                                        onClick={async () => {
-                                            if (
-                                                !confirm(
-                                                    `Eliminare la tipologia "${t.nome}"?`
-                                                )
-                                            )
-                                                return;
+                                    <ConfirmDeleteDialog
+                                        title={`Eliminare la tipologia "${t.nome}"?`}
+                                        description="L'operazione è irreversibile."
+                                        onConfirm={async () => {
                                             const r = await deleteAppointmentType(
                                                 t.id
                                             );
@@ -281,9 +275,16 @@ function TypesSection({ types }: { types: AppointmentType[] }) {
                                                 window.location.reload();
                                             } else toast.error(r.error || "Errore");
                                         }}
-                                    >
-                                        <Trash2 size={14} />
-                                    </Button>
+                                        trigger={
+                                            <Button
+                                                size="sm"
+                                                variant="ghost"
+                                                className="text-rose-600 hover:bg-rose-50 h-8 ml-auto"
+                                            >
+                                                <Trash2 size={14} />
+                                            </Button>
+                                        }
+                                    />
                                 </div>
                             </CardContent>
                         </Card>
@@ -686,13 +687,10 @@ function OverridesSection({
                                         </div>
                                     </div>
                                 </div>
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    className="text-rose-600 hover:bg-rose-50 h-8 w-8 p-0 shrink-0"
-                                    onClick={async () => {
-                                        if (!confirm("Eliminare l'eccezione?"))
-                                            return;
+                                <ConfirmDeleteDialog
+                                    title="Eliminare l'eccezione?"
+                                    description="L'eccezione di disponibilità verrà rimossa."
+                                    onConfirm={async () => {
                                         const r =
                                             await deleteAvailabilityOverride(
                                                 o.id
@@ -703,9 +701,16 @@ function OverridesSection({
                                         } else
                                             toast.error(r.error || "Errore");
                                     }}
-                                >
-                                    <Trash2 size={14} />
-                                </Button>
+                                    trigger={
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="text-rose-600 hover:bg-rose-50 h-8 w-8 p-0 shrink-0"
+                                        >
+                                            <Trash2 size={14} />
+                                        </Button>
+                                    }
+                                />
                             </CardContent>
                         </Card>
                     ))}

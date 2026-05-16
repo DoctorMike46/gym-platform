@@ -53,25 +53,8 @@ export default async function PortalLandingPage() {
                     {siteName}
                 </h1>
 
-                <div
-                    className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-6 text-xs font-bold tracking-wide"
-                    style={{
-                        backgroundColor: `${primaryColor}15`,
-                        color: primaryColor,
-                    }}
-                >
-                    <Smartphone size={12} />
-                    DA OGGI SOLO SU APP
-                </div>
-
-                <p className="text-slate-700 leading-relaxed mb-2">
-                    Il portale web non è più attivo. Tutta la tua esperienza —
-                    schede, progressi, nutrizione e prenotazioni — è ora
-                    nell&apos;app ufficiale.
-                </p>
                 <p className="text-slate-500 text-sm mb-8">
-                    Scarica l&apos;app e accedi con le stesse credenziali che
-                    usavi qui.
+                    Scarica l&apos;app per accedere alla tua area personale.
                 </p>
 
                 <div className="space-y-3">

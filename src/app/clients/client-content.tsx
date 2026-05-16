@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,9 @@ import { createClient, deleteClient } from "@/lib/actions/clients";
 import { createSubscription } from "@/lib/actions/subscriptions";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Pagination } from "@/components/ui/pagination";
+
+const DEFAULT_PAGE_SIZE = 10;
 
 export default function ClientPageContent({
     clientsData,
@@ -51,7 +54,7 @@ export default function ClientPageContent({
     const [filterService, setFilterService] = useState("all");
 
     // Derived Filtered Data
-    const filteredClients = clientsData.filter(client => {
+    const filteredClients = useMemo(() => clientsData.filter(client => {
         // Search Filter
         const searchMatch = !searchTerm ||
             client.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -71,7 +74,21 @@ export default function ClientPageContent({
         }
 
         return searchMatch && statusMatch && serviceMatch;
-    });
+    }), [clientsData, searchTerm, filterStatus, filterService]);
+
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+    const filtersKey = `${searchTerm}|${filterStatus}|${filterService}`;
+    const [prevFiltersKey, setPrevFiltersKey] = useState(filtersKey);
+    if (prevFiltersKey !== filtersKey) {
+        setPage(1);
+        setPrevFiltersKey(filtersKey);
+    }
+
+    const pagedClients = useMemo(
+        () => filteredClients.slice((page - 1) * pageSize, page * pageSize),
+        [filteredClients, page, pageSize],
+    );
 
     async function handleAddClient(formData: FormData) {
         const result = await createClient(formData);
@@ -244,7 +261,7 @@ export default function ClientPageContent({
                                     </TableCell>
                                 </TableRow>
                             )}
-                            {filteredClients.map((client) => {
+                            {pagedClients.map((client) => {
                                 const activeSub = client.subscriptions?.find((s: any) => s.status === "attivo");
 
                                 return (
@@ -355,7 +372,7 @@ export default function ClientPageContent({
                                 : "Nessun cliente trovato con i filtri attuali."}
                         </div>
                     ) : (
-                        filteredClients.map((client) => {
+                        pagedClients.map((client) => {
                             const activeSub = client.subscriptions?.find(
                                 (s: any) => s.status === "attivo"
                             );
@@ -465,6 +482,17 @@ export default function ClientPageContent({
                         })
                     )}
                 </div>
+
+                <Pagination
+                    page={page}
+                    pageSize={pageSize}
+                    total={filteredClients.length}
+                    onPageChange={setPage}
+                    onPageSizeChange={(size) => {
+                        setPageSize(size);
+                        setPage(1);
+                    }}
+                />
 
                 {/* Dialog Abbonamento */}
                 <Dialog open={isAddSubOpen} onOpenChange={setIsAddSubOpen}>

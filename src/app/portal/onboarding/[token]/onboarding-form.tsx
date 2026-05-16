@@ -8,7 +8,6 @@ import {
     EyeOff,
     ArrowRight,
     CheckCircle2,
-    Smartphone,
     Download,
 } from "lucide-react";
 import { completeOnboarding } from "@/lib/actions/portal-auth";
@@ -97,16 +96,6 @@ export default function OnboardingForm({
                         <br />
                         <strong className="text-slate-700">{email}</strong> e la
                         password appena impostata.
-                    </p>
-                </div>
-                <div
-                    className="rounded-xl p-3 flex items-center gap-3 text-left"
-                    style={{ background: `${primaryColor}10` }}
-                >
-                    <Smartphone size={20} style={{ color: primaryColor }} />
-                    <p className="text-xs text-slate-700">
-                        Il portale web è stato sostituito dall&apos;app mobile —
-                        molto più veloce e con tutte le funzioni che ti servono.
                     </p>
                 </div>
                 <div className="space-y-2">

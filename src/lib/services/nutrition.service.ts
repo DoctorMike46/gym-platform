@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { meal_plan_meals, meal_plans } from "@/db/schema";
 import { and, asc, desc, eq } from "drizzle-orm";
 import type { ClientSession } from "@/lib/client-auth";
+import type { MealItem } from "@/lib/nutrition/types";
 
 export interface MealPlanMealRow {
     id: number;
@@ -14,6 +15,7 @@ export interface MealPlanMealRow {
     carbo_g: number | null;
     grassi_g: number | null;
     note: string | null;
+    items: MealItem[] | null;
 }
 
 export interface MealPlanWithMeals {
@@ -78,6 +80,7 @@ export async function getActiveMealPlanForClient(
             carbo_g: m.carbo_g,
             grassi_g: m.grassi_g,
             note: m.note,
+            items: (m.items as MealItem[] | null) ?? null,
         })),
     };
 }

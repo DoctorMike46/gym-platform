@@ -8,7 +8,24 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Plus, Save, Download, Trash2, GripVertical, Search, ArrowLeft, ArrowUp, ArrowDown, Dumbbell } from "lucide-react";
+import { Plus, Save, Download, Trash2, GripVertical, Search, ArrowLeft, Dumbbell } from "lucide-react";
+import {
+    DndContext,
+    closestCenter,
+    KeyboardSensor,
+    PointerSensor,
+    useSensor,
+    useSensors,
+    type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+    arrayMove,
+    SortableContext,
+    sortableKeyboardCoordinates,
+    useSortable,
+    verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { createWorkoutTemplate, updateWorkoutTemplate } from "@/lib/actions/workouts";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
@@ -44,6 +61,7 @@ export default function BuilderContent({ availableExercises, initialTemplate }: 
 
     const [exercises, setExercises] = useState<WorkoutExercise[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
+    const [groupFilter, setGroupFilter] = useState<string>("all");
     const [isAddExOpen, setIsAddExOpen] = useState(false);
 
     // Effetto per pre-popolare i dati in Edit Mode
@@ -77,10 +95,25 @@ export default function BuilderContent({ availableExercises, initialTemplate }: 
         }
     }, [initialTemplate]);
 
-    const filteredExercises = availableExercises.filter(ex =>
-        ex.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        ex.gruppo_muscolare?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredExercises = availableExercises.filter(ex => {
+        if (groupFilter !== "all" && ex.gruppo_muscolare !== groupFilter) {
+            return false;
+        }
+        if (!searchQuery) return true;
+        const q = searchQuery.toLowerCase();
+        return (
+            ex.nome.toLowerCase().includes(q) ||
+            (ex.gruppo_muscolare?.toLowerCase().includes(q) ?? false)
+        );
+    });
+
+    const availableGroups = Array.from(
+        new Set(
+            availableExercises
+                .map((ex) => ex.gruppo_muscolare)
+                .filter((g): g is string => !!g),
+        ),
+    ).sort();
 
     const addExercise = (ex: Exercise) => {
         const currentGiorno = parseInt(activeTab);
@@ -95,7 +128,7 @@ export default function BuilderContent({ availableExercises, initialTemplate }: 
             serie: "3",
             ripetizioni: "10-12",
             recupero: "90s",
-            rpe: "8",
+            rpe: "",
             note_tecniche: "",
         };
         setExercises([...exercises, newEx]);
@@ -120,29 +153,27 @@ export default function BuilderContent({ availableExercises, initialTemplate }: 
         setExercises(exercises.map(ex => ex.id === id ? { ...ex, [field]: value } : ex));
     };
 
-    const moveExercise = (id: string, giorno: number, direction: 'up' | 'down') => {
+    const reorderDay = (giorno: number, fromId: string, toId: string) => {
         setExercises(prev => {
             const dayExs = [...prev.filter(ex => ex.giorno === giorno)].sort((a, b) => a.ordine - b.ordine);
-            const idx = dayExs.findIndex(ex => ex.id === id);
-
-            if (direction === 'up' && idx > 0) {
-                // Swap with previous
-                const temp = dayExs[idx].ordine;
-                dayExs[idx].ordine = dayExs[idx - 1].ordine;
-                dayExs[idx - 1].ordine = temp;
-            } else if (direction === 'down' && idx < dayExs.length - 1) {
-                // Swap with next
-                const temp = dayExs[idx].ordine;
-                dayExs[idx].ordine = dayExs[idx + 1].ordine;
-                dayExs[idx + 1].ordine = temp;
-            }
-
+            const fromIdx = dayExs.findIndex(ex => ex.id === fromId);
+            const toIdx = dayExs.findIndex(ex => ex.id === toId);
+            if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return prev;
+            const reordered = arrayMove(dayExs, fromIdx, toIdx).map((ex, i) => ({
+                ...ex,
+                ordine: i,
+            }));
             return [
                 ...prev.filter(ex => ex.giorno !== giorno),
-                ...dayExs
+                ...reordered,
             ];
         });
     };
+
+    const sensors = useSensors(
+        useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+        useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    );
 
     const handleSplitChange = (newSplit: number) => {
         if (newSplit < 1) newSplit = 1;
@@ -330,7 +361,7 @@ export default function BuilderContent({ availableExercises, initialTemplate }: 
                                             <DialogHeader>
                                                 <DialogTitle>Seleziona Esercizio (Giorno {activeTab})</DialogTitle>
                                             </DialogHeader>
-                                            <div className="space-y-4 pt-4">
+                                            <div className="space-y-3 pt-4">
                                                 <div className="relative">
                                                     <Search className="absolute left-2 top-2.5 h-4 w-4 text-slate-400" />
                                                     <Input
@@ -340,6 +371,35 @@ export default function BuilderContent({ availableExercises, initialTemplate }: 
                                                         onChange={(e) => setSearchQuery(e.target.value)}
                                                     />
                                                 </div>
+                                                {availableGroups.length > 0 && (
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setGroupFilter("all")}
+                                                            className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                                                                groupFilter === "all"
+                                                                    ? "brand-bg text-white"
+                                                                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                                            }`}
+                                                        >
+                                                            Tutti
+                                                        </button>
+                                                        {availableGroups.map((g) => (
+                                                            <button
+                                                                key={g}
+                                                                type="button"
+                                                                onClick={() => setGroupFilter(g)}
+                                                                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
+                                                                    groupFilter === g
+                                                                        ? "brand-bg text-white"
+                                                                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                                                                }`}
+                                                            >
+                                                                {g}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
                                                 <div className="max-h-[300px] overflow-y-auto space-y-1">
                                                     {filteredExercises.map(ex => (
                                                         <button
@@ -384,91 +444,36 @@ export default function BuilderContent({ availableExercises, initialTemplate }: 
                                                     </Button>
                                                 </div>
                                             ) : (
-                                                <div className="divide-y divide-slate-100">
-                                                    {dayExercises.map((ex, index) => (
-                                                        <div key={ex.id} className="p-4 hover:bg-slate-50/50 group transition-colors">
-                                                            <div className="flex gap-3 items-start">
-                                                                {/* Controlli Ordinamento */}
-                                                                <div className="mt-1 flex flex-col items-center gap-0.5 text-slate-300">
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className={`h-6 w-6 rounded-sm ${index === 0 ? 'opacity-30 cursor-default' : 'hover:bg-slate-200 hover:text-slate-600'}`}
-                                                                        onClick={() => moveExercise(ex.id, ex.giorno, 'up')}
-                                                                        disabled={index === 0}
-                                                                    >
-                                                                        <ArrowUp size={14} />
-                                                                    </Button>
-                                                                    <GripVertical size={14} className="opacity-50" />
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="icon"
-                                                                        className={`h-6 w-6 rounded-sm ${index === dayExercises.length - 1 ? 'opacity-30 cursor-default' : 'hover:bg-slate-200 hover:text-slate-600'}`}
-                                                                        onClick={() => moveExercise(ex.id, ex.giorno, 'down')}
-                                                                        disabled={index === dayExercises.length - 1}
-                                                                    >
-                                                                        <ArrowDown size={14} />
-                                                                    </Button>
-                                                                </div>
-
-                                                                <div className="flex-1 space-y-3">
-                                                                    <div className="flex justify-between items-center">
-                                                                        <span className="font-bold brand-text text-base">{index + 1}. {ex.nome}</span>
-                                                                        <Button
-                                                                            variant="ghost"
-                                                                            size="icon"
-                                                                            className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                                            onClick={() => removeExercise(ex.id, ex.giorno)}
-                                                                        >
-                                                                            <Trash2 size={16} />
-                                                                        </Button>
-                                                                    </div>
-
-                                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white border border-slate-100 p-2 rounded-lg shadow-sm">
-                                                                        <div className="space-y-1">
-                                                                            <Label className="text-[10px] uppercase text-slate-500 font-bold ml-1">Serie</Label>
-                                                                            <Input
-                                                                                className="h-8 text-sm font-medium"
-                                                                                value={ex.serie}
-                                                                                onChange={(e) => updateExercise(ex.id, "serie", e.target.value)}
-                                                                            />
-                                                                        </div>
-                                                                        <div className="space-y-1">
-                                                                            <Label className="text-[10px] uppercase text-slate-500 font-bold ml-1">Ripetizioni</Label>
-                                                                            <Input
-                                                                                className="h-8 text-sm font-medium"
-                                                                                value={ex.ripetizioni}
-                                                                                onChange={(e) => updateExercise(ex.id, "ripetizioni", e.target.value)}
-                                                                            />
-                                                                        </div>
-                                                                        <div className="space-y-1">
-                                                                            <Label className="text-[10px] uppercase text-slate-500 font-bold ml-1">Recupero</Label>
-                                                                            <Input
-                                                                                className="h-8 text-sm font-medium"
-                                                                                value={ex.recupero}
-                                                                                onChange={(e) => updateExercise(ex.id, "recupero", e.target.value)}
-                                                                            />
-                                                                        </div>
-                                                                        <div className="space-y-1">
-                                                                            <Label className="text-[10px] uppercase text-slate-500 font-bold ml-1">RPE / Buffer</Label>
-                                                                            <Input
-                                                                                className="h-8 text-sm font-medium"
-                                                                                value={ex.rpe}
-                                                                                onChange={(e) => updateExercise(ex.id, "rpe", e.target.value)}
-                                                                            />
-                                                                        </div>
-                                                                    </div>
-                                                                    <Input
-                                                                        placeholder="Note tecniche opzionali (es: usa bilanciere ez, fermo al petto 1s, ecc...)"
-                                                                        className="h-8 text-xs italic bg-slate-50/70 border-dashed text-slate-600 placeholder:text-slate-400 focus:bg-white focus:border-solid"
-                                                                        value={ex.note_tecniche}
-                                                                        onChange={(e) => updateExercise(ex.id, "note_tecniche", e.target.value)}
-                                                                    />
-                                                                </div>
-                                                            </div>
+                                                <DndContext
+                                                    sensors={sensors}
+                                                    collisionDetection={closestCenter}
+                                                    onDragEnd={(event: DragEndEvent) => {
+                                                        const { active, over } = event;
+                                                        if (!over || active.id === over.id) return;
+                                                        reorderDay(
+                                                            giorno,
+                                                            String(active.id),
+                                                            String(over.id),
+                                                        );
+                                                    }}
+                                                >
+                                                    <SortableContext
+                                                        items={dayExercises.map((ex) => ex.id)}
+                                                        strategy={verticalListSortingStrategy}
+                                                    >
+                                                        <div className="divide-y divide-slate-100">
+                                                            {dayExercises.map((ex, index) => (
+                                                                <SortableExerciseRow
+                                                                    key={ex.id}
+                                                                    ex={ex}
+                                                                    index={index}
+                                                                    onUpdate={updateExercise}
+                                                                    onRemove={removeExercise}
+                                                                />
+                                                            ))}
                                                         </div>
-                                                    ))}
-                                                </div>
+                                                    </SortableContext>
+                                                </DndContext>
                                             )}
                                         </TabsContent>
                                     );
@@ -477,6 +482,122 @@ export default function BuilderContent({ availableExercises, initialTemplate }: 
 
                         </Tabs>
                     </Card>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function SortableExerciseRow({
+    ex,
+    index,
+    onUpdate,
+    onRemove,
+}: {
+    ex: WorkoutExercise;
+    index: number;
+    onUpdate: (id: string, field: keyof WorkoutExercise, value: string) => void;
+    onRemove: (id: string, giorno: number) => void;
+}) {
+    const {
+        attributes,
+        listeners,
+        setNodeRef,
+        transform,
+        transition,
+        isDragging,
+    } = useSortable({ id: ex.id });
+
+    const style = {
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.5 : 1,
+        zIndex: isDragging ? 10 : "auto",
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={style}
+            className={`p-4 hover:bg-slate-50/50 group transition-colors ${
+                isDragging ? "bg-slate-50" : ""
+            }`}
+        >
+            <div className="flex gap-3 items-start">
+                <button
+                    type="button"
+                    aria-label="Trascina per riordinare"
+                    {...attributes}
+                    {...listeners}
+                    className="mt-1 h-8 w-6 flex items-center justify-center rounded-sm text-slate-300 hover:text-slate-600 hover:bg-slate-100 cursor-grab active:cursor-grabbing touch-none"
+                >
+                    <GripVertical size={16} />
+                </button>
+
+                <div className="flex-1 space-y-3">
+                    <div className="flex justify-between items-center">
+                        <span className="font-bold brand-text text-base">
+                            {index + 1}. {ex.nome}
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={() => onRemove(ex.id, ex.giorno)}
+                        >
+                            <Trash2 size={16} />
+                        </Button>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3 bg-white border border-slate-100 p-2 rounded-lg shadow-sm">
+                        <div className="space-y-1">
+                            <Label className="text-[10px] uppercase text-slate-500 font-bold ml-1">
+                                Serie
+                            </Label>
+                            <Input
+                                className="h-8 text-sm font-medium"
+                                placeholder="3 o 3-4"
+                                value={ex.serie}
+                                onChange={(e) =>
+                                    onUpdate(ex.id, "serie", e.target.value)
+                                }
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-[10px] uppercase text-slate-500 font-bold ml-1">
+                                Ripetizioni
+                            </Label>
+                            <Input
+                                className="h-8 text-sm font-medium"
+                                placeholder="10, 8-12, AMRAP"
+                                value={ex.ripetizioni}
+                                onChange={(e) =>
+                                    onUpdate(ex.id, "ripetizioni", e.target.value)
+                                }
+                            />
+                        </div>
+                        <div className="space-y-1">
+                            <Label className="text-[10px] uppercase text-slate-500 font-bold ml-1">
+                                Recupero
+                            </Label>
+                            <Input
+                                className="h-8 text-sm font-medium"
+                                placeholder="90s o 1-2 min"
+                                value={ex.recupero}
+                                onChange={(e) =>
+                                    onUpdate(ex.id, "recupero", e.target.value)
+                                }
+                            />
+                        </div>
+                    </div>
+                    <Input
+                        placeholder="Note tecniche opzionali (es: usa bilanciere ez, fermo al petto 1s, ecc...)"
+                        className="h-8 text-xs italic bg-slate-50/70 border-dashed text-slate-600 placeholder:text-slate-400 focus:bg-white focus:border-solid"
+                        value={ex.note_tecniche}
+                        onChange={(e) =>
+                            onUpdate(ex.id, "note_tecniche", e.target.value)
+                        }
+                    />
                 </div>
             </div>
         </div>

@@ -10,6 +10,9 @@ export const generateWorkoutPDF = async (
     const vfs = pdfFonts.pdfMake?.vfs || pdfFonts.vfs || pdfFonts.default?.pdfMake?.vfs || pdfFonts.default?.vfs;
     pdfMake.vfs = vfs;
 
+    const primaryColor = trainerSettings?.primary_color || '#003366';
+    const siteName = trainerSettings?.site_name || "Ernesto Performance";
+
     // Organizziamo gli esercizi per giorno
     const daysMap = new Map<number, any[]>();
     if (template.exercises && Array.isArray(template.exercises)) {
@@ -24,91 +27,131 @@ export const generateWorkoutPDF = async (
     // Costruiamo il contenuto array del PDF
     const content: any[] = [];
 
-    // Header / Logo
+    // ── Header: logo (sx) + titolo scheda (centro) ──────────────────
+    let logoBase64: string | null = null;
     if (trainerSettings?.logo_url) {
-        // Qui ci assicuriamo di usare path assoluti per il client o caricare in Base64
-        // ma pdfmake in browser accetta URL direct se non cross-origin.
-        // Convert local path /uploads/x to window.location.origin
         const fullLogoUrl = window.location.origin + trainerSettings.logo_url;
-        content.push({
-            image: await fetchImageAsBase64(fullLogoUrl) || "", // Fallback gestito dopo
-            width: 120,
-            alignment: 'center',
-            margin: [0, 0, 0, 20]
-        });
-    } else {
-        content.push({
-            text: trainerSettings?.site_name || "Ernesto Performance",
-            style: 'headerLogo',
-            alignment: 'center',
-            margin: [0, 0, 0, 20]
-        });
+        logoBase64 = await fetchImageAsBase64(fullLogoUrl);
     }
 
-    // Titolo Scheda
     content.push({
-        text: template.nome_template,
-        style: 'header',
-        alignment: 'center',
-        margin: [0, 0, 0, 5]
+        columns: [
+            logoBase64
+                ? { image: logoBase64, width: 70, alignment: 'left' as const }
+                : { text: siteName, style: 'headerLogo', alignment: 'left' as const },
+            {
+                stack: [
+                    { text: template.nome_template, style: 'header', alignment: 'right' as const },
+                    {
+                        text: `${template.split_settimanale} sessioni a settimana`,
+                        style: 'subheader',
+                        alignment: 'right' as const,
+                        margin: [0, 2, 0, 0] as [number, number, number, number],
+                    },
+                ],
+            },
+        ],
+        margin: [0, 0, 0, 10] as [number, number, number, number],
     });
 
-    // Info Cliente (Optional)
+    // Linea separatrice colorata
+    content.push({
+        canvas: [
+            {
+                type: 'line',
+                x1: 0,
+                y1: 0,
+                x2: 515,
+                y2: 0,
+                lineWidth: 2,
+                lineColor: primaryColor,
+            },
+        ],
+        margin: [0, 5, 0, 15] as [number, number, number, number],
+    });
+
+    // ── Box info cliente (se presente) ──────────────────────────────
     if (clientData) {
         content.push({
-            text: `Cliente: ${clientData.nome} ${clientData.cognome}`,
-            style: 'clientInfo',
-            alignment: 'center',
-            margin: [0, 5, 0, 2]
-        });
-        content.push({
-            text: `Assegnata il: ${clientData.dataAssegnazione}`,
-            style: 'clientSubInfo',
-            alignment: 'center',
-            margin: [0, 0, 0, 5]
+            table: {
+                widths: ['*'],
+                body: [[
+                    {
+                        stack: [
+                            {
+                                columns: [
+                                    {
+                                        text: 'CLIENTE',
+                                        style: 'boxLabel',
+                                        width: 60,
+                                    },
+                                    {
+                                        text: `${clientData.nome} ${clientData.cognome}`,
+                                        style: 'boxValue',
+                                        width: '*',
+                                    },
+                                ],
+                            },
+                            {
+                                columns: [
+                                    {
+                                        text: 'ASSEGNATA',
+                                        style: 'boxLabel',
+                                        width: 60,
+                                    },
+                                    {
+                                        text: clientData.dataAssegnazione,
+                                        style: 'boxValue',
+                                        width: '*',
+                                    },
+                                ],
+                                margin: [0, 3, 0, 0] as [number, number, number, number],
+                            },
+                        ],
+                        margin: [10, 8, 10, 8] as [number, number, number, number],
+                    },
+                ]],
+            },
+            layout: {
+                fillColor: () => '#f8fafc',
+                hLineWidth: () => 0,
+                vLineWidth: () => 0,
+            },
+            margin: [0, 0, 0, 15] as [number, number, number, number],
         });
     }
 
-    // Split Info
-    content.push({
-        text: `${template.split_settimanale} Sessioni a Settimana`,
-        style: 'subheader',
-        alignment: 'center',
-        margin: [0, 5, 0, 20]
-    });
-
-    // Progressioni (se presenti)
+    // ── Note di progressione ────────────────────────────────────────
     if (template.note_progressione) {
         content.push({
-            text: 'Regole di Progressione:',
+            text: 'REGOLE DI PROGRESSIONE',
             style: 'sectionTitle',
-            margin: [0, 10, 0, 5]
+            margin: [0, 5, 0, 5] as [number, number, number, number],
         });
         content.push({
             text: template.note_progressione,
             style: 'normalText',
-            margin: [0, 0, 0, 20]
+            margin: [0, 0, 0, 15] as [number, number, number, number],
         });
     }
 
-    // Generazione Tabelle Giornaliere
+    // ── Tabelle giornaliere ─────────────────────────────────────────
     Array.from(daysMap.entries()).sort(([a], [b]) => a - b).forEach(([dayNum, dayExs]) => {
 
         content.push({
             text: `GIORNO ${dayNum}`,
             style: 'dayTitle',
-            margin: [0, 20, 0, 10]
+            margin: [0, 15, 0, 8] as [number, number, number, number],
         });
 
         // Tabella
         const tableBody = [
             // Header row
             [
-                { text: 'Esercizio', style: 'tableHeader' },
+                { text: 'Esercizio', style: 'tableHeader', alignment: 'left' as const },
                 { text: 'Serie', style: 'tableHeader' },
                 { text: 'Ripetizioni', style: 'tableHeader' },
                 { text: 'Recupero', style: 'tableHeader' },
-                { text: 'RPE/Buffer', style: 'tableHeader' },
                 { text: 'Note', style: 'tableHeader' }
             ]
         ];
@@ -117,22 +160,30 @@ export const generateWorkoutPDF = async (
         dayExs.sort((a, b) => a.ordine - b.ordine).forEach((ex, idx) => {
             const exName = ex.exercise?.nome || ex.nome || "Esercizio rimosso";
             tableBody.push([
-                { text: `${idx + 1}. ${exName}`, style: 'tableCellBold' },
+                { text: `${idx + 1}. ${exName}`, style: 'tableCellBold', alignment: 'left' as const },
                 { text: ex.serie || '-', style: 'tableCell' },
                 { text: ex.ripetizioni || '-', style: 'tableCell' },
                 { text: ex.recupero || '-', style: 'tableCell' },
-                { text: ex.rpe || '-', style: 'tableCell' },
-                { text: ex.note_tecniche || '-', style: 'tableCellSmall' },
+                { text: ex.note_tecniche || '-', style: 'tableCellSmall', alignment: 'left' as const },
             ]);
         });
 
         content.push({
             table: {
                 headerRows: 1,
-                widths: ['*', '10%', '15%', '15%', '12%', '25%'],
-                body: tableBody
+                widths: ['*', '11%', '17%', '17%', '28%'],
+                body: tableBody,
+                dontBreakRows: true,
             },
-            layout: 'lightHorizontalLines'
+            layout: {
+                fillColor: (rowIndex: number) => {
+                    if (rowIndex === 0) return null;
+                    return rowIndex % 2 === 1 ? '#f8fafc' : null;
+                },
+                hLineWidth: () => 0.5,
+                vLineWidth: () => 0,
+                hLineColor: () => '#e2e8f0',
+            },
         });
     });
 
@@ -143,27 +194,48 @@ export const generateWorkoutPDF = async (
             { text: "Nota importante\n", bold: true },
             workoutFooterText
         ],
-        style: 'footer',
+        style: 'disclaimer',
         alignment: 'center' as const,
-        margin: [0, 40, 0, 0] as [number, number, number, number]
+        margin: [0, 30, 0, 0] as [number, number, number, number],
     });
 
     const docDefinition = {
         content: content,
+        pageMargins: [40, 40, 40, 60] as [number, number, number, number],
+        footer: function (currentPage: number, pageCount: number) {
+            return {
+                columns: [
+                    {
+                        text: siteName,
+                        alignment: 'left' as const,
+                        margin: [40, 20, 0, 0] as [number, number, number, number],
+                        fontSize: 8,
+                        color: '#94a3b8',
+                    },
+                    {
+                        text: `Pagina ${currentPage} di ${pageCount}`,
+                        alignment: 'right' as const,
+                        margin: [0, 20, 40, 0] as [number, number, number, number],
+                        fontSize: 8,
+                        color: '#94a3b8',
+                    },
+                ],
+            };
+        },
         styles: {
-            headerLogo: { fontSize: 22, bold: true, color: trainerSettings?.primary_color || '#003366' },
-            header: { fontSize: 24, bold: true, color: '#1e293b' },
-            clientInfo: { fontSize: 16, bold: true, color: trainerSettings?.primary_color || '#003366' },
-            clientSubInfo: { fontSize: 12, italics: true, color: '#64748b' },
-            subheader: { fontSize: 14, color: '#64748b' },
-            sectionTitle: { fontSize: 14, bold: true, color: '#334155' },
-            dayTitle: { fontSize: 18, bold: true, color: trainerSettings?.primary_color || '#003366' },
-            normalText: { fontSize: 11, color: '#475569', leadingIndent: 10 },
-            tableHeader: { bold: true, fontSize: 11, color: 'white', fillColor: trainerSettings?.primary_color || '#003366', alignment: 'center' as const },
-            tableCell: { fontSize: 10, alignment: 'center' as const, margin: [0, 5, 0, 5] as [number, number, number, number] },
-            tableCellBold: { fontSize: 11, bold: true, margin: [0, 5, 0, 5] as [number, number, number, number] },
-            tableCellSmall: { fontSize: 9, italics: true, color: '#64748b', margin: [0, 5, 0, 5] as [number, number, number, number] },
-            footer: { fontSize: 9, color: '#64748b' }
+            headerLogo: { fontSize: 18, bold: true, color: primaryColor },
+            header: { fontSize: 20, bold: true, color: '#1e293b' },
+            subheader: { fontSize: 11, color: '#64748b' },
+            boxLabel: { fontSize: 8, bold: true, color: '#94a3b8', characterSpacing: 0.5 },
+            boxValue: { fontSize: 11, bold: true, color: '#1e293b' },
+            sectionTitle: { fontSize: 10, bold: true, color: primaryColor, characterSpacing: 0.8 },
+            dayTitle: { fontSize: 14, bold: true, color: primaryColor, characterSpacing: 0.5 },
+            normalText: { fontSize: 10, color: '#475569', lineHeight: 1.4 },
+            tableHeader: { bold: true, fontSize: 10, color: 'white', fillColor: primaryColor, alignment: 'center' as const, margin: [0, 5, 0, 5] as [number, number, number, number] },
+            tableCell: { fontSize: 10, alignment: 'center' as const, color: '#334155', margin: [0, 6, 0, 6] as [number, number, number, number] },
+            tableCellBold: { fontSize: 10, bold: true, color: '#1e293b', margin: [4, 6, 0, 6] as [number, number, number, number] },
+            tableCellSmall: { fontSize: 9, italics: true, color: '#64748b', margin: [4, 6, 0, 6] as [number, number, number, number] },
+            disclaimer: { fontSize: 8, color: '#94a3b8', italics: true, lineHeight: 1.3 },
         },
         defaultStyle: {
             font: 'Roboto'

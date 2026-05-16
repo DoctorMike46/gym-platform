@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useMemo, useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
+import { Pagination } from "@/components/ui/pagination";
+
+const DEFAULT_PAGE_SIZE = 10;
 import {
     Dialog,
     DialogContent,
@@ -35,6 +40,8 @@ import {
     Clock,
     Plus,
     Pencil,
+    Search,
+    ChevronDown,
 } from "lucide-react";
 import {
     assignTemplateToClients,
@@ -188,24 +195,76 @@ function TemplatesList({
     templates: Template[];
     onAssign: (t: Template) => void;
 }) {
-    const [pending, startTransition] = useTransition();
+    const [pending] = useTransition();
+    const [search, setSearch] = useState("");
+    const [tipoFilter, setTipoFilter] = useState<string>("all");
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-    function handleDelete(t: Template) {
-        if (!confirm(`Eliminare il template "${t.nome}"?`)) return;
-        startTransition(async () => {
-            const r = await deleteTemplate(t.id);
-            if (r.success) {
-                toast.success("Template eliminato");
-                window.location.reload();
-            } else toast.error(r.error || "Errore");
+    const tipi = useMemo(() => {
+        const set = new Set(templates.map((t) => t.tipo).filter(Boolean));
+        return Array.from(set);
+    }, [templates]);
+
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return templates.filter((t) => {
+            if (tipoFilter !== "all" && t.tipo !== tipoFilter) return false;
+            if (!q) return true;
+            const haystack = `${t.nome} ${t.descrizione ?? ""}`.toLowerCase();
+            return haystack.includes(q);
         });
+    }, [templates, search, tipoFilter]);
+
+    const filtersKey = `${search}|${tipoFilter}`;
+    const [prevFiltersKey, setPrevFiltersKey] = useState(filtersKey);
+    if (prevFiltersKey !== filtersKey) {
+        setPage(1);
+        setPrevFiltersKey(filtersKey);
+    }
+
+    const pagedTemplates = useMemo(
+        () => filtered.slice((page - 1) * pageSize, page * pageSize),
+        [filtered, page, pageSize],
+    );
+
+    async function handleDelete(t: Template) {
+        const r = await deleteTemplate(t.id);
+        if (r.success) {
+            toast.success("Template eliminato");
+            window.location.reload();
+        } else toast.error(r.error || "Errore");
     }
 
     return (
         <div className="space-y-3">
-            <div className="flex justify-end">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                        placeholder="Cerca template per nome o descrizione…"
+                        className="pl-9 border-slate-200 shadow-none h-10"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </div>
+                {tipi.length > 1 && (
+                    <Select value={tipoFilter} onValueChange={setTipoFilter}>
+                        <SelectTrigger className="w-full sm:w-[180px] border-slate-200 shadow-none h-10">
+                            <SelectValue placeholder="Tutti i tipi" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Tutti i tipi</SelectItem>
+                            {tipi.map((t) => (
+                                <SelectItem key={t} value={t}>
+                                    {t}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                )}
                 <Link href="/questionnaires/templates/new">
-                    <Button className="brand-bg text-white gap-2 shadow-lg">
+                    <Button className="brand-bg text-white gap-2 shadow-lg w-full sm:w-auto">
                         <Plus size={16} />
                         Nuovo template
                     </Button>
@@ -227,9 +286,15 @@ function TemplatesList({
                         </p>
                     </CardContent>
                 </Card>
+            ) : filtered.length === 0 ? (
+                <Card className="bg-white border-slate-200 shadow-sm">
+                    <CardContent className="py-8 text-center text-sm text-slate-500">
+                        Nessun template trovato con i filtri attuali.
+                    </CardContent>
+                </Card>
             ) : (
                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                    {templates.map((t) => {
+                    {pagedTemplates.map((t) => {
                         const schema = t.schema_json as {
                             questions?: { id: string }[];
                             sections?: { id: string }[];
@@ -290,15 +355,21 @@ function TemplatesList({
                                                 Modifica
                                             </Button>
                                         </Link>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            disabled={pending}
-                                            onClick={() => handleDelete(t)}
-                                            className="h-8 w-8 p-0 text-rose-600 hover:bg-rose-50"
-                                        >
-                                            <Trash2 size={13} />
-                                        </Button>
+                                        <ConfirmDeleteDialog
+                                            title={`Eliminare il template "${t.nome}"?`}
+                                            description="Tutti gli assignment basati su questo template manterranno la copia dei dati ma non sarà più possibile crearne di nuovi."
+                                            onConfirm={() => handleDelete(t)}
+                                            trigger={
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    disabled={pending}
+                                                    className="h-8 w-8 p-0 text-rose-600 hover:bg-rose-50"
+                                                >
+                                                    <Trash2 size={13} />
+                                                </Button>
+                                            }
+                                        />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -306,8 +377,30 @@ function TemplatesList({
                     })}
                 </div>
             )}
+            <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={filtered.length}
+                onPageChange={setPage}
+                onPageSizeChange={(s) => {
+                    setPageSize(s);
+                    setPage(1);
+                }}
+            />
         </div>
     );
+}
+
+type AssignmentGroup = {
+    clientId: number;
+    clientNome: string;
+    clientCognome: string;
+    items: AssignmentRow[];
+    latestAt: number;
+};
+
+function initials(nome: string | null, cognome: string | null): string {
+    return `${(nome?.[0] ?? "?").toUpperCase()}${(cognome?.[0] ?? "").toUpperCase()}`;
 }
 
 function AssignmentList({
@@ -319,6 +412,60 @@ function AssignmentList({
     emptyText: string;
     onSelect: (id: number) => void;
 }) {
+    const [search, setSearch] = useState("");
+    const [openClients, setOpenClients] = useState<Set<number>>(new Set());
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+    const groups: AssignmentGroup[] = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        const filtered = q
+            ? items.filter((a) => {
+                  const haystack = `${a.client_nome ?? ""} ${a.client_cognome ?? ""} ${a.template_nome ?? ""}`.toLowerCase();
+                  return haystack.includes(q);
+              })
+            : items;
+
+        const map = new Map<number, AssignmentGroup>();
+        for (const a of filtered) {
+            const existing = map.get(a.client_id);
+            const ts = new Date(
+                a.status === "completed" && a.completed_at
+                    ? a.completed_at
+                    : a.sent_at,
+            ).getTime();
+            if (existing) {
+                existing.items.push(a);
+                if (ts > existing.latestAt) existing.latestAt = ts;
+            } else {
+                map.set(a.client_id, {
+                    clientId: a.client_id,
+                    clientNome: a.client_nome ?? "",
+                    clientCognome: a.client_cognome ?? "",
+                    items: [a],
+                    latestAt: ts,
+                });
+            }
+        }
+        return Array.from(map.values()).sort(
+            (a, b) => b.latestAt - a.latestAt,
+        );
+    }, [items, search]);
+
+    const filtersKey = `${search}`;
+    const [prevFiltersKey, setPrevFiltersKey] = useState(filtersKey);
+    if (prevFiltersKey !== filtersKey) {
+        setPage(1);
+        setPrevFiltersKey(filtersKey);
+    }
+
+    const pagedGroups = useMemo(
+        () => groups.slice((page - 1) * pageSize, page * pageSize),
+        [groups, page, pageSize],
+    );
+
+    const hasSearch = search.trim().length > 0;
+
     if (items.length === 0) {
         return (
             <Card className="bg-white border-slate-200 shadow-sm">
@@ -336,70 +483,185 @@ function AssignmentList({
         );
     }
     return (
-        <div className="space-y-2">
-            {items.map((a) => {
-                const isCompleted = a.status === "completed";
+        <div className="space-y-3">
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                    placeholder="Cerca per cliente o template…"
+                    className="pl-9 border-slate-200 shadow-none h-10"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+            </div>
+            {groups.length === 0 && (
+                <Card className="bg-white border-slate-200 shadow-sm">
+                    <CardContent className="py-8 text-center text-sm text-slate-500">
+                        Nessun risultato per &quot;{search}&quot;.
+                    </CardContent>
+                </Card>
+            )}
+            {pagedGroups.map((g) => {
+                const single = g.items.length === 1;
+                const expanded = hasSearch || openClients.has(g.clientId);
+                const pendingCount = g.items.filter(
+                    (i) => i.status === "pending",
+                ).length;
+                const completedCount = g.items.filter(
+                    (i) => i.status === "completed",
+                ).length;
+
                 return (
                     <Card
-                        key={a.id}
-                        className={`bg-white shadow-sm overflow-hidden cursor-pointer hover:bg-slate-50/60 transition-colors ${
-                            isCompleted ? "brand-border" : "border-slate-200"
-                        }`}
-                        onClick={() => onSelect(a.id)}
+                        key={g.clientId}
+                        className="bg-white border-slate-200 shadow-sm overflow-hidden"
                     >
-                        <CardContent className="py-3 px-4 flex items-center justify-between gap-3">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (single) {
+                                    onSelect(g.items[0].id);
+                                    return;
+                                }
+                                setOpenClients((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(g.clientId))
+                                        next.delete(g.clientId);
+                                    else next.add(g.clientId);
+                                    return next;
+                                });
+                            }}
+                            className="w-full flex items-center justify-between gap-3 py-3 px-4 hover:bg-slate-50/60 transition-colors text-left"
+                        >
                             <div className="flex items-center gap-3 min-w-0">
-                                <div
-                                    className={`h-10 w-10 rounded-lg flex items-center justify-center shrink-0 ${
-                                        isCompleted
-                                            ? "brand-bg text-white"
-                                            : "bg-slate-100 text-slate-500"
-                                    }`}
-                                >
-                                    {isCompleted ? (
-                                        <CheckCircle2 size={18} />
-                                    ) : (
-                                        <Clock size={18} />
-                                    )}
+                                <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center brand-text font-bold text-sm shrink-0">
+                                    {initials(g.clientNome, g.clientCognome)}
                                 </div>
                                 <div className="min-w-0">
                                     <div className="font-semibold text-slate-900 truncate">
-                                        {a.client_nome} {a.client_cognome}
+                                        {g.clientNome} {g.clientCognome}
                                     </div>
-                                    <div className="text-xs text-slate-500 flex items-center gap-1.5 flex-wrap">
-                                        <span>{a.template_nome}</span>
-                                        <span className="text-slate-300">·</span>
-                                        <span className="inline-flex items-center gap-1">
-                                            <Calendar size={11} />
-                                            {isCompleted && a.completed_at
-                                                ? `Risposto ${formatDate(a.completed_at)}`
-                                                : `Inviato ${formatDate(a.sent_at)}`}
+                                    <div className="text-xs text-slate-500 flex items-center gap-2 flex-wrap">
+                                        <span>
+                                            {g.items.length}{" "}
+                                            {g.items.length === 1
+                                                ? "questionario"
+                                                : "questionari"}
                                         </span>
+                                        {pendingCount > 0 && (
+                                            <>
+                                                <span className="text-slate-300">
+                                                    ·
+                                                </span>
+                                                <span className="text-amber-600">
+                                                    {pendingCount} in attesa
+                                                </span>
+                                            </>
+                                        )}
+                                        {completedCount > 0 && (
+                                            <>
+                                                <span className="text-slate-300">
+                                                    ·
+                                                </span>
+                                                <span className="brand-text">
+                                                    {completedCount} risposto
+                                                </span>
+                                            </>
+                                        )}
                                     </div>
-                                    {a.motivo && (
-                                        <div className="text-[11px] text-slate-400 italic mt-0.5 truncate">
-                                            {a.motivo}
-                                        </div>
-                                    )}
                                 </div>
                             </div>
-                            {isCompleted ? (
+                            {single ? (
                                 <Eye
                                     size={16}
                                     className="text-slate-300 shrink-0"
                                 />
                             ) : (
-                                <Badge
-                                    variant="outline"
-                                    className="bg-amber-50 text-amber-700 border-amber-200 text-xs shrink-0"
-                                >
-                                    In attesa
-                                </Badge>
+                                <ChevronDown
+                                    size={18}
+                                    className={`text-slate-400 shrink-0 transition-transform ${
+                                        expanded ? "rotate-180" : ""
+                                    }`}
+                                />
                             )}
-                        </CardContent>
+                        </button>
+                        {expanded && !single && (
+                            <div className="border-t border-slate-100 bg-slate-50/40 divide-y divide-slate-100">
+                                {g.items.map((a) => {
+                                    const isCompleted = a.status === "completed";
+                                    return (
+                                        <button
+                                            key={a.id}
+                                            type="button"
+                                            onClick={() => onSelect(a.id)}
+                                            className="w-full flex items-center justify-between gap-3 py-2.5 px-4 pl-16 hover:bg-white transition-colors text-left"
+                                        >
+                                            <div className="min-w-0 flex items-center gap-2.5">
+                                                <div
+                                                    className={`h-7 w-7 rounded-md flex items-center justify-center shrink-0 ${
+                                                        isCompleted
+                                                            ? "brand-bg text-white"
+                                                            : "bg-slate-200 text-slate-600"
+                                                    }`}
+                                                >
+                                                    {isCompleted ? (
+                                                        <CheckCircle2 size={14} />
+                                                    ) : (
+                                                        <Clock size={14} />
+                                                    )}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-medium text-slate-900 truncate">
+                                                        {a.template_nome}
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-500 flex items-center gap-1">
+                                                        <Calendar size={10} />
+                                                        {isCompleted && a.completed_at
+                                                            ? `Risposto ${formatDate(a.completed_at)}`
+                                                            : `Inviato ${formatDate(a.sent_at)}`}
+                                                        {a.motivo && (
+                                                            <>
+                                                                <span className="text-slate-300">
+                                                                    ·
+                                                                </span>
+                                                                <span className="italic truncate">
+                                                                    {a.motivo}
+                                                                </span>
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {isCompleted ? (
+                                                <Eye
+                                                    size={14}
+                                                    className="text-slate-300 shrink-0"
+                                                />
+                                            ) : (
+                                                <Badge
+                                                    variant="outline"
+                                                    className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] shrink-0"
+                                                >
+                                                    In attesa
+                                                </Badge>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </Card>
                 );
             })}
+            <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={groups.length}
+                onPageChange={setPage}
+                onPageSizeChange={(s) => {
+                    setPageSize(s);
+                    setPage(1);
+                }}
+            />
         </div>
     );
 }
@@ -563,7 +825,7 @@ function ResponseDetailDialog({
 }) {
     const [data, setData] = useState<DetailLoaded | null>(null);
     const [loading, setLoading] = useState(true);
-    const [pending, startTransition] = useTransition();
+    const [pending] = useTransition();
 
     useEffect(() => {
         let cancelled = false;
@@ -583,17 +845,14 @@ function ResponseDetailDialog({
         };
     }, [assignmentId, onClose]);
 
-    function onDelete() {
-        if (!confirm("Eliminare questo assignment?")) return;
-        startTransition(async () => {
-            const r = await deleteAssignment(assignmentId);
-            if (r.success) {
-                toast.success("Eliminato");
-                window.location.reload();
-            } else {
-                toast.error(r.error || "Errore");
-            }
-        });
+    async function onDelete() {
+        const r = await deleteAssignment(assignmentId);
+        if (r.success) {
+            toast.success("Eliminato");
+            window.location.reload();
+        } else {
+            toast.error(r.error || "Errore");
+        }
     }
 
     if (loading || !data) {
@@ -692,15 +951,21 @@ function ResponseDetailDialog({
                     >
                         Chiudi
                     </Button>
-                    <Button
-                        variant="ghost"
-                        onClick={onDelete}
-                        disabled={pending}
-                        className="text-rose-600 hover:bg-rose-50 gap-1.5"
-                    >
-                        <Trash2 size={14} />
-                        Elimina
-                    </Button>
+                    <ConfirmDeleteDialog
+                        title="Eliminare questo assignment?"
+                        description="L'assegnazione verrà rimossa. Se il cliente ha già compilato il questionario, anche le sue risposte verranno eliminate."
+                        onConfirm={onDelete}
+                        trigger={
+                            <Button
+                                variant="ghost"
+                                disabled={pending}
+                                className="text-rose-600 hover:bg-rose-50 gap-1.5"
+                            >
+                                <Trash2 size={14} />
+                                Elimina
+                            </Button>
+                        }
+                    />
                 </DialogFooter>
             </DialogContent>
         </Dialog>

@@ -1,10 +1,26 @@
 "use server";
 
 import { db } from "@/db";
-import { clients, meal_plan_meals, meal_plans } from "@/db/schema";
+import {
+    body_measurements,
+    client_nutrition_profile,
+    clients,
+    meal_plan_meals,
+    meal_plans,
+} from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { and, asc, desc, eq } from "drizzle-orm";
 import { getAuthenticatedTrainer } from "@/lib/auth";
+import { getOpenAIClient, OPENAI_TEXT_MODEL, OPENAI_VISION_MODEL } from "@/lib/openai";
+import { searchFoods, type FoodResult } from "@/lib/services/food-lookup.service";
+import {
+    parseAltezzaCm,
+    parsePesoKg,
+    type LivelloAttivita,
+    type Obiettivo,
+    type Sesso,
+} from "@/lib/nutrition/calcs";
+import type { MealItem } from "@/lib/nutrition/types";
 
 const VALID_MOMENTI = [
     "colazione",
@@ -25,6 +41,7 @@ interface MealInput {
     carbo_g: number | null;
     grassi_g: number | null;
     note: string | null;
+    items?: MealItem[] | null;
 }
 
 function parseIntOrNull(v: unknown): number | null {
@@ -312,6 +329,7 @@ export async function replaceMealPlanMeals(
                 carbo_g: m.carbo_g ?? null,
                 grassi_g: m.grassi_g ?? null,
                 note: m.note?.trim() || null,
+                items: m.items && m.items.length > 0 ? m.items : null,
             }));
 
         await db.delete(meal_plan_meals).where(eq(meal_plan_meals.meal_plan_id, planId));
@@ -384,4 +402,556 @@ export async function deleteMealPlan(planId: number) {
         console.error("Errore eliminazione piano:", error);
         return { success: false, error: "Errore interno server" };
     }
+}
+
+// ── AI: generazione piano alimentare ──────────────────────────────────
+
+const AI_FOOD_ITEM_SCHEMA = {
+    type: "object",
+    additionalProperties: false,
+    required: [
+        "alimento",
+        "quantita_g",
+        "kcal",
+        "proteine_g",
+        "carbo_g",
+        "grassi_g",
+        "note",
+    ],
+    properties: {
+        alimento: { type: "string" },
+        quantita_g: { type: "integer", minimum: 0 },
+        kcal: { type: "integer", minimum: 0 },
+        proteine_g: { type: "integer", minimum: 0 },
+        carbo_g: { type: "integer", minimum: 0 },
+        grassi_g: { type: "integer", minimum: 0 },
+        note: { type: ["string", "null"] },
+    },
+} as const;
+
+const AI_PLAN_JSON_SCHEMA = {
+    name: "meal_plan",
+    schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["meals"],
+        properties: {
+            meals: {
+                type: "array",
+                description:
+                    "Tutti i pasti per 7 giorni, ordinati per giorno e ordine all'interno del giorno.",
+                items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: [
+                        "giorno_settimana",
+                        "momento",
+                        "ordine",
+                        "descrizione",
+                        "kcal",
+                        "proteine_g",
+                        "carbo_g",
+                        "grassi_g",
+                        "note",
+                        "items",
+                    ],
+                    properties: {
+                        giorno_settimana: {
+                            type: "integer",
+                            minimum: 1,
+                            maximum: 7,
+                            description: "1=Lunedì, 7=Domenica",
+                        },
+                        momento: {
+                            type: "string",
+                            enum: [
+                                "colazione",
+                                "spuntino_mat",
+                                "pranzo",
+                                "spuntino_pom",
+                                "cena",
+                                "pre_nanna",
+                            ],
+                        },
+                        ordine: { type: "integer", minimum: 0 },
+                        descrizione: {
+                            type: "string",
+                            description:
+                                "Riassunto testuale del pasto con porzioni in grammi. Es: '80g pasta integrale + 150g pollo + 30g olio EVO'.",
+                        },
+                        kcal: { type: "integer", minimum: 0 },
+                        proteine_g: { type: "integer", minimum: 0 },
+                        carbo_g: { type: "integer", minimum: 0 },
+                        grassi_g: { type: "integer", minimum: 0 },
+                        note: { type: ["string", "null"] },
+                        items: {
+                            type: "array",
+                            description:
+                                "Alimenti strutturati che compongono il pasto. Ogni alimento DEVE avere 3 alternative dello stesso macros target (±10% kcal).",
+                            items: {
+                                type: "object",
+                                additionalProperties: false,
+                                required: [
+                                    "alimento",
+                                    "quantita_g",
+                                    "kcal",
+                                    "proteine_g",
+                                    "carbo_g",
+                                    "grassi_g",
+                                    "note",
+                                    "alternatives",
+                                ],
+                                properties: {
+                                    ...AI_FOOD_ITEM_SCHEMA.properties,
+                                    alternatives: {
+                                        type: "array",
+                                        description:
+                                            "Almeno 3 alimenti alternativi con macros equivalenti (±10% kcal).",
+                                        items: AI_FOOD_ITEM_SCHEMA,
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+    strict: true,
+} as const;
+
+export interface AIGenerateParams {
+    clientId: number;
+    obiettivo: "definizione" | "massa" | "mantenimento" | "ricomposizione";
+    kcalTarget?: number;
+    proteineG?: number;
+    carboG?: number;
+    grassiG?: number;
+    preferenze?: string;
+    momenti?: string[];
+}
+
+const GIORNI_LABEL = [
+    "Lunedì",
+    "Martedì",
+    "Mercoledì",
+    "Giovedì",
+    "Venerdì",
+    "Sabato",
+    "Domenica",
+];
+
+async function generateSingleDayPlan(args: {
+    dayIdx: number; // 1-7
+    momenti: string[];
+    obiettivo: string;
+    kcalTarget?: number;
+    proteineG?: number;
+    carboG?: number;
+    grassiG?: number;
+    preferenze?: string;
+}): Promise<AIPlanMeal[]> {
+    const {
+        dayIdx,
+        momenti,
+        obiettivo,
+        kcalTarget,
+        proteineG,
+        carboG,
+        grassiG,
+        preferenze,
+    } = args;
+    const lines: string[] = [];
+    lines.push(`Giorno: ${GIORNI_LABEL[dayIdx - 1]} (giorno_settimana=${dayIdx}).`);
+    lines.push(`Obiettivo: ${obiettivo}.`);
+    if (kcalTarget) lines.push(`Calorie target: ${kcalTarget} kcal.`);
+    if (proteineG) lines.push(`Proteine: ${proteineG} g.`);
+    if (carboG) lines.push(`Carboidrati: ${carboG} g.`);
+    if (grassiG) lines.push(`Grassi: ${grassiG} g.`);
+    lines.push(`Momenti: ${momenti.join(", ")}.`);
+    if (preferenze) lines.push(`Note: ${preferenze}.`);
+
+    const system = `Sei un nutrizionista sportivo italiano. Genera UN SOLO GIORNO di piano alimentare.
+
+REGOLE OBBLIGATORIE:
+- Output: JSON conforme allo schema, array "meals" con esattamente ${momenti.length} pasti.
+- TUTTI i pasti hanno giorno_settimana=${dayIdx}.
+- Per ogni pasto:
+  * "ordine" parte da 0 per il primo momento e cresce
+  * "descrizione" riassunto testuale (es: "80g pasta + 150g pollo + 30g olio EVO")
+  * "items" lista strutturata degli alimenti con porzioni in grammi e macros per quella quantità
+  * kcal/macros del pasto = somma degli items
+- Per ogni item, fornisci ESATTAMENTE 3 alternatives con macros equivalenti (±10% kcal).
+- I valori kcal/macros sono interi.
+- Cucina italiana. Rispetta regime alimentare/allergie/esclusioni dell'utente.`;
+
+    const user = lines.join("\n");
+
+    const openai = getOpenAIClient();
+    const response = await openai.chat.completions.create({
+        model: OPENAI_TEXT_MODEL,
+        messages: [
+            { role: "system", content: system },
+            { role: "user", content: user },
+        ],
+        response_format: {
+            type: "json_schema",
+            json_schema: AI_PLAN_JSON_SCHEMA,
+        },
+        temperature: 0.7,
+    });
+
+    const finish = response.choices[0]?.finish_reason;
+    const content = response.choices[0]?.message?.content;
+    if (!content || finish !== "stop") {
+        throw new Error(
+            `Generazione giorno ${dayIdx} interrotta (${finish ?? "no content"})`,
+        );
+    }
+    const parsed = JSON.parse(content) as AIPlanResponse;
+    // Garantisce giorno_settimana corretto anche se il modello sbaglia
+    return parsed.meals.map((m) => ({ ...m, giorno_settimana: dayIdx }));
+}
+
+export async function generateMealPlanWithAI(params: AIGenerateParams) {
+    const trainer = await getAuthenticatedTrainer();
+    try {
+        await assertClientOwnership(trainer.id, params.clientId);
+
+        const momenti =
+            params.momenti && params.momenti.length > 0
+                ? params.momenti
+                : ["colazione", "spuntino_mat", "pranzo", "spuntino_pom", "cena"];
+
+        // 7 chiamate parallele, una per giorno: indispensabile perché il modello
+        // gpt-4o-mini con items+alternatives non riesce a generare 7 giorni in un
+        // singolo response (token output ~16k saturati o early-stop).
+        const dayPromises = Array.from({ length: 7 }, (_, i) =>
+            generateSingleDayPlan({
+                dayIdx: i + 1,
+                momenti,
+                obiettivo: params.obiettivo,
+                kcalTarget: params.kcalTarget,
+                proteineG: params.proteineG,
+                carboG: params.carboG,
+                grassiG: params.grassiG,
+                preferenze: params.preferenze,
+            }),
+        );
+        const days = await Promise.all(dayPromises);
+        const meals: AIPlanMeal[] = days.flat();
+
+        return { success: true as const, meals };
+    } catch (e) {
+        console.error("generateMealPlanWithAI error:", e);
+        const msg = e instanceof Error ? e.message : "Errore generazione AI";
+        return { success: false as const, error: msg };
+    }
+}
+
+interface AIPlanItem {
+    alimento: string;
+    quantita_g: number;
+    kcal: number;
+    proteine_g: number;
+    carbo_g: number;
+    grassi_g: number;
+    note?: string | null;
+}
+
+interface AIPlanItemWithAlts extends AIPlanItem {
+    alternatives: AIPlanItem[];
+}
+
+interface AIPlanMeal {
+    giorno_settimana: number;
+    momento: string;
+    ordine: number;
+    descrizione: string;
+    kcal: number;
+    proteine_g: number;
+    carbo_g: number;
+    grassi_g: number;
+    note?: string | null;
+    items?: AIPlanItemWithAlts[];
+}
+
+interface AIPlanResponse {
+    meals: AIPlanMeal[];
+}
+
+/**
+ * Importa un piano alimentare da PDF/immagine usando OpenAI Vision.
+ * Restituisce la struttura JSON dei pasti, da editare prima di salvare.
+ */
+export async function importMealPlanFromFile(formData: FormData) {
+    const trainer = await getAuthenticatedTrainer();
+    try {
+        const clientIdRaw = formData.get("client_id");
+        const file = formData.get("file");
+        if (!clientIdRaw || !(file instanceof File)) {
+            return { success: false as const, error: "Parametri mancanti" };
+        }
+        const clientId = Number(clientIdRaw);
+        if (!Number.isFinite(clientId)) {
+            return { success: false as const, error: "client_id non valido" };
+        }
+        await assertClientOwnership(trainer.id, clientId);
+
+        const mime = file.type || "application/octet-stream";
+        const allowed = [
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/webp",
+            "application/pdf",
+        ];
+        if (!allowed.includes(mime)) {
+            return {
+                success: false as const,
+                error: "Tipo file non supportato (PDF, JPG, PNG, WEBP)",
+            };
+        }
+        const buffer = Buffer.from(await file.arrayBuffer());
+        if (buffer.length > 10 * 1024 * 1024) {
+            return { success: false as const, error: "File troppo grande (max 10MB)" };
+        }
+        const base64 = buffer.toString("base64");
+        const dataUri = `data:${mime};base64,${base64}`;
+
+        const system = `Sei un assistente che estrae la struttura di un piano alimentare da un documento (PDF o immagine).
+
+OBIETTIVO: produrre un JSON conforme allo schema con tutti i pasti rilevati per i 7 giorni della settimana.
+
+REGOLE:
+- Se il documento copre meno di 7 giorni, replica i giorni mancanti seguendo il pattern visibile.
+- Se mancano kcal o macro espliciti, stimali in base alle porzioni (numeri interi).
+- "momento" deve essere uno tra: colazione, spuntino_mat, pranzo, spuntino_pom, cena, pre_nanna. Mappa "merenda" o "snack" mattutini a spuntino_mat e pomeridiani a spuntino_pom.
+- "giorno_settimana": 1=Lunedì, 7=Domenica.
+- "ordine": parte da 0 nel primo momento di ogni giorno.
+- "descrizione": riporta porzioni in grammi quando specificate nel documento.`;
+
+        const openai = getOpenAIClient();
+        const response = await openai.chat.completions.create({
+            model: OPENAI_VISION_MODEL,
+            messages: [
+                { role: "system", content: system },
+                {
+                    role: "user",
+                    content: [
+                        {
+                            type: "text",
+                            text: "Estrai il piano alimentare contenuto in questo documento.",
+                        },
+                        {
+                            type: "image_url",
+                            image_url: { url: dataUri },
+                        },
+                    ],
+                },
+            ],
+            response_format: {
+                type: "json_schema",
+                json_schema: AI_PLAN_JSON_SCHEMA,
+            },
+        });
+
+        const content = response.choices[0]?.message?.content;
+        if (!content) {
+            return { success: false as const, error: "Risposta AI vuota" };
+        }
+        const parsed = JSON.parse(content) as AIPlanResponse;
+        return { success: true as const, meals: parsed.meals };
+    } catch (e) {
+        console.error("importMealPlanFromFile error:", e);
+        const msg = e instanceof Error ? e.message : "Errore import";
+        return { success: false as const, error: msg };
+    }
+}
+
+// ── Food lookup (Open Food Facts + cache locale) ──────────────────
+
+export async function searchFoodsAction(query: string): Promise<FoodResult[]> {
+    await getAuthenticatedTrainer();
+    return searchFoods(query);
+}
+
+// ── Client Nutrition Profile ─────────────────────────────────────
+
+export interface NutritionProfileData {
+    sesso: Sesso | null;
+    livello_attivita: LivelloAttivita | null;
+    obiettivo_default: Obiettivo | null;
+    regime_alimentare: string | null;
+    allergeni: string[];
+    intolleranze: string | null;
+    preferenze_alimenti: string[];
+    esclusioni_alimenti: string[];
+    note_aggiuntive: string | null;
+}
+
+export interface ClientNutritionFullData {
+    client: {
+        id: number;
+        nome: string;
+        cognome: string;
+        eta: number | null;
+        data_di_nascita: string | null;
+        peso_text: string | null;
+        altezza_text: string | null;
+    };
+    derived: {
+        pesoKg: number | null;
+        altezzaCm: number | null;
+    };
+    profile: NutritionProfileData | null;
+    latestMeasurement: {
+        date: string;
+        peso_kg: string | null;
+    } | null;
+}
+
+function rowToProfile(row: typeof client_nutrition_profile.$inferSelect): NutritionProfileData {
+    return {
+        sesso: (row.sesso as Sesso | null) ?? null,
+        livello_attivita: (row.livello_attivita as LivelloAttivita | null) ?? null,
+        obiettivo_default: (row.obiettivo_default as Obiettivo | null) ?? null,
+        regime_alimentare: row.regime_alimentare ?? null,
+        allergeni: Array.isArray(row.allergeni) ? (row.allergeni as string[]) : [],
+        intolleranze: row.intolleranze ?? null,
+        preferenze_alimenti: Array.isArray(row.preferenze_alimenti)
+            ? (row.preferenze_alimenti as string[])
+            : [],
+        esclusioni_alimenti: Array.isArray(row.esclusioni_alimenti)
+            ? (row.esclusioni_alimenti as string[])
+            : [],
+        note_aggiuntive: row.note_aggiuntive ?? null,
+    };
+}
+
+export async function getNutritionProfile(
+    clientId: number,
+): Promise<NutritionProfileData | null> {
+    const trainer = await getAuthenticatedTrainer();
+    await assertClientOwnership(trainer.id, clientId);
+    const [row] = await db
+        .select()
+        .from(client_nutrition_profile)
+        .where(eq(client_nutrition_profile.client_id, clientId))
+        .limit(1);
+    return row ? rowToProfile(row) : null;
+}
+
+export async function upsertNutritionProfile(
+    clientId: number,
+    data: Partial<NutritionProfileData>,
+) {
+    const trainer = await getAuthenticatedTrainer();
+    try {
+        await assertClientOwnership(trainer.id, clientId);
+
+        const [existing] = await db
+            .select({ id: client_nutrition_profile.id })
+            .from(client_nutrition_profile)
+            .where(eq(client_nutrition_profile.client_id, clientId))
+            .limit(1);
+
+        const payload = {
+            sesso: data.sesso ?? null,
+            livello_attivita: data.livello_attivita ?? null,
+            obiettivo_default: data.obiettivo_default ?? null,
+            regime_alimentare: data.regime_alimentare ?? null,
+            allergeni: data.allergeni ?? [],
+            intolleranze: data.intolleranze ?? null,
+            preferenze_alimenti: data.preferenze_alimenti ?? [],
+            esclusioni_alimenti: data.esclusioni_alimenti ?? [],
+            note_aggiuntive: data.note_aggiuntive ?? null,
+            updated_at: new Date(),
+        };
+
+        if (existing) {
+            await db
+                .update(client_nutrition_profile)
+                .set(payload)
+                .where(eq(client_nutrition_profile.id, existing.id));
+        } else {
+            await db.insert(client_nutrition_profile).values({
+                client_id: clientId,
+                trainer_id: trainer.id,
+                ...payload,
+            });
+        }
+        revalidatePath(`/clients/${clientId}`);
+        revalidatePath("/nutrition");
+        return { success: true as const };
+    } catch (e) {
+        console.error("upsertNutritionProfile error:", e);
+        return { success: false as const, error: "Errore salvataggio profilo" };
+    }
+}
+
+/**
+ * Restituisce tutti i dati necessari per pre-popolare il form nuovo piano:
+ * anagrafica cliente, ultima misurazione peso, profilo nutrizionale.
+ */
+export async function getClientFullDataForNutrition(
+    clientId: number,
+): Promise<ClientNutritionFullData | null> {
+    const trainer = await getAuthenticatedTrainer();
+    try {
+        await assertClientOwnership(trainer.id, clientId);
+    } catch {
+        return null;
+    }
+
+    const [client] = await db
+        .select({
+            id: clients.id,
+            nome: clients.nome,
+            cognome: clients.cognome,
+            eta: clients.eta,
+            data_di_nascita: clients.data_di_nascita,
+            peso: clients.peso,
+            altezza: clients.altezza,
+        })
+        .from(clients)
+        .where(eq(clients.id, clientId))
+        .limit(1);
+    if (!client) return null;
+
+    const [latestMeas] = await db
+        .select({ date: body_measurements.date, peso_kg: body_measurements.peso_kg })
+        .from(body_measurements)
+        .where(eq(body_measurements.client_id, clientId))
+        .orderBy(desc(body_measurements.date))
+        .limit(1);
+
+    const [profileRow] = await db
+        .select()
+        .from(client_nutrition_profile)
+        .where(eq(client_nutrition_profile.client_id, clientId))
+        .limit(1);
+
+    // pesoKg preferisce la misurazione più recente, altrimenti il text di clients.peso
+    const pesoFromMeas = latestMeas ? parsePesoKg(latestMeas.peso_kg) : null;
+    const pesoFromClient = parsePesoKg(client.peso);
+    const pesoKg = pesoFromMeas ?? pesoFromClient;
+    const altezzaCm = parseAltezzaCm(client.altezza);
+
+    return {
+        client: {
+            id: client.id,
+            nome: client.nome,
+            cognome: client.cognome,
+            eta: client.eta,
+            data_di_nascita: client.data_di_nascita,
+            peso_text: client.peso,
+            altezza_text: client.altezza,
+        },
+        derived: { pesoKg, altezzaCm },
+        profile: profileRow ? rowToProfile(profileRow) : null,
+        latestMeasurement: latestMeas
+            ? { date: latestMeas.date, peso_kg: latestMeas.peso_kg }
+            : null,
+    };
 }

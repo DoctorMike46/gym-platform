@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import {
     Card,
     CardContent,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
@@ -16,7 +17,18 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import { ConfirmDeleteDialog } from "@/components/ui/confirm-delete-dialog";
+import { Pagination } from "@/components/ui/pagination";
 import { toast } from "sonner";
+
+const DEFAULT_PAGE_SIZE = 10;
 import {
     CheckCircle2,
     Clock,
@@ -29,6 +41,8 @@ import {
     StickyNote,
     UserX,
     AlarmClock,
+    Search,
+    ChevronDown,
 } from "lucide-react";
 import {
     cancelAppointmentByTrainer,
@@ -184,6 +198,19 @@ export default function BookingsContent({
     );
 }
 
+type BookingGroup = {
+    clientId: number;
+    clientNome: string;
+    clientCognome: string;
+    clientEmail: string | null;
+    items: AppointmentRow[];
+    pivotAt: number;
+};
+
+function bookingInitials(nome: string | null, cognome: string | null): string {
+    return `${(nome?.[0] ?? "?").toUpperCase()}${(cognome?.[0] ?? "").toUpperCase()}`;
+}
+
 function BookingList({
     items,
     emptyText,
@@ -193,6 +220,81 @@ function BookingList({
     emptyText: string;
     onSelect: (a: AppointmentRow) => void;
 }) {
+    const [search, setSearch] = useState("");
+    const [typeFilter, setTypeFilter] = useState<string>("all");
+    const [openClients, setOpenClients] = useState<Set<number>>(new Set());
+    const [page, setPage] = useState(1);
+    const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+    const types = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const a of items) {
+            if (a.type_id !== null && a.type_nome) {
+                map.set(String(a.type_id), a.type_nome);
+            }
+        }
+        return Array.from(map.entries());
+    }, [items]);
+
+    const groups: BookingGroup[] = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        const filtered = items.filter((a) => {
+            if (
+                typeFilter !== "all" &&
+                String(a.type_id ?? "") !== typeFilter
+            )
+                return false;
+            if (!q) return true;
+            const haystack = `${a.client_nome ?? ""} ${a.client_cognome ?? ""} ${a.client_email ?? ""} ${a.type_nome ?? ""}`.toLowerCase();
+            return haystack.includes(q);
+        });
+
+        const map = new Map<number, BookingGroup>();
+        for (const a of filtered) {
+            const ts = new Date(a.start_at).getTime();
+            const existing = map.get(a.client_id);
+            if (existing) {
+                existing.items.push(a);
+                if (ts > existing.pivotAt) existing.pivotAt = ts;
+            } else {
+                map.set(a.client_id, {
+                    clientId: a.client_id,
+                    clientNome: a.client_nome ?? "",
+                    clientCognome: a.client_cognome ?? "",
+                    clientEmail: a.client_email,
+                    items: [a],
+                    pivotAt: ts,
+                });
+            }
+        }
+
+        const groups = Array.from(map.values()).sort(
+            (a, b) => b.pivotAt - a.pivotAt,
+        );
+        for (const g of groups) {
+            g.items.sort(
+                (x, y) =>
+                    new Date(y.start_at).getTime() -
+                    new Date(x.start_at).getTime(),
+            );
+        }
+        return groups;
+    }, [items, search, typeFilter]);
+
+    const filtersKey = `${search}|${typeFilter}`;
+    const [prevFiltersKey, setPrevFiltersKey] = useState(filtersKey);
+    if (prevFiltersKey !== filtersKey) {
+        setPage(1);
+        setPrevFiltersKey(filtersKey);
+    }
+
+    const pagedGroups = useMemo(
+        () => groups.slice((page - 1) * pageSize, page * pageSize),
+        [groups, page, pageSize],
+    );
+
+    const hasSearch = search.trim().length > 0 || typeFilter !== "all";
+
     if (items.length === 0) {
         return (
             <Card className="bg-white border-slate-200 shadow-sm">
@@ -210,65 +312,197 @@ function BookingList({
         );
     }
     return (
-        <div className="space-y-2">
-            {items.map((a) => {
-                const sb = statusBadge(a.status);
+        <div className="space-y-3">
+            <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                        placeholder="Cerca per cliente, email o tipologia…"
+                        className="pl-9 border-slate-200 shadow-none h-10"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                    />
+                </div>
+                {types.length > 1 && (
+                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                        <SelectTrigger className="w-full sm:w-[200px] border-slate-200 shadow-none h-10">
+                            <SelectValue placeholder="Tipologia" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Tutte le tipologie</SelectItem>
+                            {types.map(([id, nome]) => (
+                                <SelectItem key={id} value={id}>
+                                    {nome}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                )}
+            </div>
+            {groups.length === 0 ? (
+                <Card className="bg-white border-slate-200 shadow-sm">
+                    <CardContent className="py-8 text-center text-sm text-slate-500">
+                        Nessun risultato con i filtri attuali.
+                    </CardContent>
+                </Card>
+            ) : null}
+            {pagedGroups.map((g) => {
+                const single = g.items.length === 1;
+                const expanded = hasSearch || openClients.has(g.clientId);
+                const nextAppt = g.items[0];
+                const sbNext = statusBadge(nextAppt.status);
+
                 return (
                     <Card
-                        key={a.id}
-                        className="bg-white border-slate-200 shadow-sm cursor-pointer hover:bg-slate-50/60 transition-colors"
-                        onClick={() => onSelect(a)}
+                        key={g.clientId}
+                        className="bg-white border-slate-200 shadow-sm overflow-hidden"
                     >
-                        <CardContent className="py-3 px-4 flex items-center justify-between gap-3">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                if (single) {
+                                    onSelect(g.items[0]);
+                                    return;
+                                }
+                                setOpenClients((prev) => {
+                                    const next = new Set(prev);
+                                    if (next.has(g.clientId))
+                                        next.delete(g.clientId);
+                                    else next.add(g.clientId);
+                                    return next;
+                                });
+                            }}
+                            className="w-full flex items-center justify-between gap-3 py-3 px-4 hover:bg-slate-50/60 transition-colors text-left"
+                        >
                             <div className="flex items-center gap-3 min-w-0">
-                                <div
-                                    className="h-12 w-12 rounded-lg flex flex-col items-center justify-center shrink-0"
-                                    style={{
-                                        backgroundColor:
-                                            (a.type_colore ?? "#3b82f6") + "22",
-                                        color: a.type_colore ?? "#3b82f6",
-                                    }}
-                                >
-                                    <span className="text-[10px] font-bold uppercase">
-                                        {new Date(a.start_at).toLocaleDateString(
-                                            "it-IT",
-                                            { month: "short" }
-                                        )}
-                                    </span>
-                                    <span className="text-base font-bold leading-none">
-                                        {new Date(a.start_at).getDate()}
-                                    </span>
+                                <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center brand-text font-bold text-sm shrink-0">
+                                    {bookingInitials(
+                                        g.clientNome,
+                                        g.clientCognome,
+                                    )}
                                 </div>
                                 <div className="min-w-0">
                                     <div className="font-semibold text-slate-900 truncate">
-                                        {a.client_nome} {a.client_cognome}
+                                        {g.clientNome} {g.clientCognome}
                                     </div>
                                     <div className="text-xs text-slate-500 flex items-center gap-2 flex-wrap">
                                         <span>
-                                            {formatTime(a.start_at)} –{" "}
-                                            {formatTime(a.end_at)}
+                                            {g.items.length}{" "}
+                                            {g.items.length === 1
+                                                ? "prenotazione"
+                                                : "prenotazioni"}
                                         </span>
-                                        {a.type_nome && (
-                                            <>
-                                                <span className="text-slate-300">
-                                                    ·
-                                                </span>
-                                                <span>{a.type_nome}</span>
-                                            </>
-                                        )}
+                                        <span className="text-slate-300">·</span>
+                                        <span className="inline-flex items-center gap-1">
+                                            <Calendar size={11} />
+                                            {new Date(
+                                                nextAppt.start_at,
+                                            ).toLocaleDateString("it-IT", {
+                                                day: "2-digit",
+                                                month: "short",
+                                            })}{" "}
+                                            {formatTime(nextAppt.start_at)}
+                                        </span>
                                     </div>
                                 </div>
                             </div>
-                            <Badge
-                                variant="outline"
-                                className={`shrink-0 ${sb.color} text-xs`}
-                            >
-                                {sb.label}
-                            </Badge>
-                        </CardContent>
+                            {single ? (
+                                <Badge
+                                    variant="outline"
+                                    className={`shrink-0 ${sbNext.color} text-xs`}
+                                >
+                                    {sbNext.label}
+                                </Badge>
+                            ) : (
+                                <ChevronDown
+                                    size={18}
+                                    className={`text-slate-400 shrink-0 transition-transform ${
+                                        expanded ? "rotate-180" : ""
+                                    }`}
+                                />
+                            )}
+                        </button>
+                        {expanded && !single && (
+                            <div className="border-t border-slate-100 bg-slate-50/40 divide-y divide-slate-100">
+                                {g.items.map((a) => {
+                                    const sb = statusBadge(a.status);
+                                    return (
+                                        <button
+                                            key={a.id}
+                                            type="button"
+                                            onClick={() => onSelect(a)}
+                                            className="w-full flex items-center justify-between gap-3 py-2.5 px-4 pl-16 hover:bg-white transition-colors text-left"
+                                        >
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <div
+                                                    className="h-9 w-9 rounded-md flex flex-col items-center justify-center shrink-0"
+                                                    style={{
+                                                        backgroundColor:
+                                                            (a.type_colore ??
+                                                                "#3b82f6") +
+                                                            "22",
+                                                        color:
+                                                            a.type_colore ??
+                                                            "#3b82f6",
+                                                    }}
+                                                >
+                                                    <span className="text-[9px] font-bold uppercase leading-none">
+                                                        {new Date(
+                                                            a.start_at,
+                                                        ).toLocaleDateString(
+                                                            "it-IT",
+                                                            { month: "short" },
+                                                        )}
+                                                    </span>
+                                                    <span className="text-sm font-bold leading-tight">
+                                                        {new Date(
+                                                            a.start_at,
+                                                        ).getDate()}
+                                                    </span>
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="text-sm font-medium text-slate-900 truncate">
+                                                        {formatTime(a.start_at)} –{" "}
+                                                        {formatTime(a.end_at)}
+                                                        {a.type_nome && (
+                                                            <span className="text-slate-500 font-normal">
+                                                                {" · "}
+                                                                {a.type_nome}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[11px] text-slate-400 capitalize">
+                                                        {a.modalita.replace(
+                                                            "_",
+                                                            " ",
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <Badge
+                                                variant="outline"
+                                                className={`shrink-0 ${sb.color} text-[10px]`}
+                                            >
+                                                {sb.label}
+                                            </Badge>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </Card>
                 );
             })}
+            <Pagination
+                page={page}
+                pageSize={pageSize}
+                total={groups.length}
+                onPageChange={setPage}
+                onPageSizeChange={(s) => {
+                    setPageSize(s);
+                    setPage(1);
+                }}
+            />
         </div>
     );
 }
@@ -323,15 +557,12 @@ function BookingDetailDialog({
         });
     }
 
-    function onNoShow() {
-        if (!confirm("Confermare che il cliente non si è presentato?")) return;
-        startTransition(async () => {
-            const r = await markAppointmentNoShow(appt.id);
-            if (r.success) {
-                toast.success("Cliente segnato come assente");
-                refresh();
-            } else toast.error(r.error || "Errore");
-        });
+    async function onNoShow() {
+        const r = await markAppointmentNoShow(appt.id);
+        if (r.success) {
+            toast.success("Cliente segnato come assente");
+            refresh();
+        } else toast.error(r.error || "Errore");
     }
 
     const sb = statusBadge(appt.status);
@@ -482,14 +713,21 @@ function BookingDetailDialog({
                                 </Button>
                             )}
                             {canComplete && (
-                                <Button
-                                    variant="outline"
-                                    onClick={onNoShow}
-                                    disabled={pending}
-                                    className="border-slate-200 text-slate-700"
-                                >
-                                    <UserX size={14} className="mr-1" /> No-show
-                                </Button>
+                                <ConfirmDeleteDialog
+                                    title="Cliente assente?"
+                                    description="Verrà segnato come no-show. Potrai sempre tornare indietro modificando lo stato dal database."
+                                    confirmLabel="Sì, no-show"
+                                    onConfirm={onNoShow}
+                                    trigger={
+                                        <Button
+                                            variant="outline"
+                                            disabled={pending}
+                                            className="border-slate-200 text-slate-700"
+                                        >
+                                            <UserX size={14} className="mr-1" /> No-show
+                                        </Button>
+                                    }
+                                />
                             )}
                             {canComplete && (
                                 <Button

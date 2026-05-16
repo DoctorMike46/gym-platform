@@ -26,19 +26,7 @@ import { Plus, Dumbbell, PlayCircle, Edit2, Trash2, Search, GripVertical } from 
 import { createExercise, deleteExercise, updateExercise } from "@/lib/actions/exercises";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
-
-const GRUPPI_MUSCOLARI = [
-    "Petto",
-    "Dorso",
-    "Spalle",
-    "Gambe",
-    "Bicipiti",
-    "Tricipiti",
-    "Addome",
-    "Cardio",
-    "Full Body",
-    "Altro"
-];
+import { GRUPPI_MUSCOLARI } from "@/lib/constants/muscle-groups";
 
 // Helper per gestire l'array dinamico nello State
 export interface ExecutionStep {

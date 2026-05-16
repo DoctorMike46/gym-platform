@@ -69,6 +69,79 @@ extension MealMomentX on MealMoment {
   }
 }
 
+class MealItemAlternative {
+  const MealItemAlternative({
+    required this.alimento,
+    required this.quantitaG,
+    required this.kcal,
+    required this.proteineG,
+    required this.carboG,
+    required this.grassiG,
+    this.note,
+  });
+
+  final String alimento;
+  final int quantitaG;
+  final int kcal;
+  final int proteineG;
+  final int carboG;
+  final int grassiG;
+  final String? note;
+
+  factory MealItemAlternative.fromJson(Map<String, dynamic> json) {
+    return MealItemAlternative(
+      alimento: json['alimento'] as String? ?? '',
+      quantitaG: (json['quantita_g'] as num?)?.toInt() ?? 0,
+      kcal: (json['kcal'] as num?)?.toInt() ?? 0,
+      proteineG: (json['proteine_g'] as num?)?.toInt() ?? 0,
+      carboG: (json['carbo_g'] as num?)?.toInt() ?? 0,
+      grassiG: (json['grassi_g'] as num?)?.toInt() ?? 0,
+      note: json['note'] as String?,
+    );
+  }
+}
+
+class MealItem {
+  const MealItem({
+    required this.alimento,
+    required this.quantitaG,
+    required this.kcal,
+    required this.proteineG,
+    required this.carboG,
+    required this.grassiG,
+    this.note,
+    this.alternatives = const [],
+  });
+
+  final String alimento;
+  final int quantitaG;
+  final int kcal;
+  final int proteineG;
+  final int carboG;
+  final int grassiG;
+  final String? note;
+  final List<MealItemAlternative> alternatives;
+
+  factory MealItem.fromJson(Map<String, dynamic> json) {
+    final altsRaw = json['alternatives'] as List<dynamic>?;
+    return MealItem(
+      alimento: json['alimento'] as String? ?? '',
+      quantitaG: (json['quantita_g'] as num?)?.toInt() ?? 0,
+      kcal: (json['kcal'] as num?)?.toInt() ?? 0,
+      proteineG: (json['proteine_g'] as num?)?.toInt() ?? 0,
+      carboG: (json['carbo_g'] as num?)?.toInt() ?? 0,
+      grassiG: (json['grassi_g'] as num?)?.toInt() ?? 0,
+      note: json['note'] as String?,
+      alternatives: altsRaw == null
+          ? const []
+          : altsRaw
+              .cast<Map<String, dynamic>>()
+              .map(MealItemAlternative.fromJson)
+              .toList(),
+    );
+  }
+}
+
 class Meal {
   const Meal({
     required this.id,
@@ -81,6 +154,7 @@ class Meal {
     this.carbo,
     this.grassi,
     this.note,
+    this.items = const [],
   });
 
   final int id;
@@ -93,8 +167,10 @@ class Meal {
   final int? carbo;
   final int? grassi;
   final String? note;
+  final List<MealItem> items;
 
   factory Meal.fromJson(Map<String, dynamic> json) {
+    final itemsRaw = json['items'] as List<dynamic>?;
     return Meal(
       id: (json['id'] as num).toInt(),
       giornoSettimana: (json['giorno_settimana'] as num).toInt(),
@@ -107,6 +183,12 @@ class Meal {
       carbo: (json['carbo_g'] as num?)?.toInt(),
       grassi: (json['grassi_g'] as num?)?.toInt(),
       note: json['note'] as String?,
+      items: itemsRaw == null
+          ? const []
+          : itemsRaw
+              .cast<Map<String, dynamic>>()
+              .map(MealItem.fromJson)
+              .toList(),
     );
   }
 }

@@ -51,6 +51,16 @@ export async function createClient(formData: FormData) {
         return { success: true };
     } catch (error: any) {
         console.error("Errore creazione cliente:", error);
+        if (
+            error?.code === "23505" ||
+            String(error?.message ?? "").includes("clients_trainer_email_idx") ||
+            String(error?.message ?? "").includes("duplicate key")
+        ) {
+            return {
+                success: false,
+                error: "Questa email è già registrata per un altro cliente.",
+            };
+        }
         return { success: false, error: error.message || "Errore sconosciuto" };
     }
 }

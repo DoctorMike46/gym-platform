@@ -319,6 +319,8 @@ class _NextWorkoutCard extends ConsumerWidget {
                   const SizedBox(height: 16),
                   Text(
                     activeName ?? 'La tua scheda',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.w800,

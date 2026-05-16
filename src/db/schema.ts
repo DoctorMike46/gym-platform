@@ -298,6 +298,11 @@ export const meal_plans = pgTable("meal_plans", {
 // ─── Meal Plan Meals (pasti per giorno della settimana) ────────────
 // momento: 'colazione' | 'spuntino_mat' | 'pranzo' | 'spuntino_pom' | 'cena' | 'pre_nanna'
 // giorno_settimana: 1=Lun, ..., 7=Dom
+// items (JSONB): array strutturato di alimenti del pasto, ognuno con
+// proprie alternative scambiabili a parità di macros. Forma:
+//   [{ alimento, quantita, kcal, proteine_g, carbo_g, grassi_g,
+//      alternatives: [{ alimento, quantita, kcal, proteine_g, carbo_g, grassi_g }] }]
+// `descrizione` rimane come riassunto testuale del pasto (retrocompatibilità).
 export const meal_plan_meals = pgTable(
   "meal_plan_meals",
   {
@@ -314,12 +319,61 @@ export const meal_plan_meals = pgTable(
     carbo_g: integer("carbo_g"),
     grassi_g: integer("grassi_g"),
     note: text("note"),
+    items: jsonb("items"),
   },
   (t) => ({
     planDayIdx: index("meal_plan_meals_plan_day_idx").on(
       t.meal_plan_id,
       t.giorno_settimana
     ),
+  })
+);
+
+// ─── Client Nutrition Profile (1-a-1 con clients) ──────────────────
+// Dati clinici/preferenze nutrizionali del cliente, separati da `clients`.
+// allergeni/preferenze_alimenti/esclusioni_alimenti sono JSONB array di stringhe.
+export const client_nutrition_profile = pgTable(
+  "client_nutrition_profile",
+  {
+    id: serial("id").primaryKey(),
+    client_id: integer("client_id")
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull()
+      .unique(),
+    trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+    sesso: text("sesso"), // 'M' | 'F' | 'altro'
+    livello_attivita: text("livello_attivita"), // 'sedentario' | 'leggero' | 'moderato' | 'intenso' | 'molto_intenso'
+    obiettivo_default: text("obiettivo_default"), // 'definizione' | 'mantenimento' | 'massa' | 'ricomposizione'
+    regime_alimentare: text("regime_alimentare"), // 'onnivoro' | 'vegetariano' | 'vegano' | 'pescetariano' | 'altro'
+    allergeni: jsonb("allergeni"),
+    intolleranze: text("intolleranze"),
+    preferenze_alimenti: jsonb("preferenze_alimenti"),
+    esclusioni_alimenti: jsonb("esclusioni_alimenti"),
+    note_aggiuntive: text("note_aggiuntive"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  }
+);
+
+// ─── Foods Cache (Open Food Facts lookup cache) ──────────────────
+// Cache locale di alimenti scaricati da Open Food Facts. Tutti i valori
+// sono per 100g (standard OFF). Condiviso tra tutti i trainer (cache globale).
+export const foods_cache = pgTable(
+  "foods_cache",
+  {
+    id: serial("id").primaryKey(),
+    off_id: text("off_id").unique(), // barcode/code di Open Food Facts (null se inserito manualmente)
+    nome: text("nome").notNull(),
+    brand: text("brand"),
+    kcal_per_100g: integer("kcal_per_100g"),
+    proteine_g: integer("proteine_g"),
+    carbo_g: integer("carbo_g"),
+    grassi_g: integer("grassi_g"),
+    fibre_g: integer("fibre_g"),
+    last_fetched_at: timestamp("last_fetched_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    nomeIdx: index("foods_cache_nome_idx").on(t.nome),
   })
 );
 
