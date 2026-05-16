@@ -21,6 +21,7 @@ import {
     type Sesso,
 } from "@/lib/nutrition/calcs";
 import type { MealItem } from "@/lib/nutrition/types";
+import { preferDecrypted } from "@/lib/pii-helpers";
 
 const VALID_MOMENTI = [
     "colazione",
@@ -1097,7 +1098,11 @@ export async function getClientFullDataForNutrition(
     if (!client) return null;
 
     const [latestMeas] = await db
-        .select({ date: body_measurements.date, peso_kg: body_measurements.peso_kg })
+        .select({
+            date: body_measurements.date,
+            peso_kg: body_measurements.peso_kg,
+            peso_kg_enc: body_measurements.peso_kg_enc,
+        })
         .from(body_measurements)
         .where(eq(body_measurements.client_id, clientId))
         .orderBy(desc(body_measurements.date))
@@ -1110,7 +1115,9 @@ export async function getClientFullDataForNutrition(
         .limit(1);
 
     // pesoKg preferisce la misurazione più recente, altrimenti il text di clients.peso
-    const pesoFromMeas = latestMeas ? parsePesoKg(latestMeas.peso_kg) : null;
+    const pesoFromMeas = latestMeas
+        ? parsePesoKg(preferDecrypted(latestMeas.peso_kg, latestMeas.peso_kg_enc))
+        : null;
     const pesoFromClient = parsePesoKg(client.peso);
     const pesoKg = pesoFromMeas ?? pesoFromClient;
     const altezzaCm = parseAltezzaCm(client.altezza);

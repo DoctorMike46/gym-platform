@@ -15,6 +15,7 @@ import { eq, and, desc, asc } from "drizzle-orm";
 import { getAuthenticatedTrainer } from "@/lib/auth";
 import { getR2SignedUrl } from "@/lib/r2";
 import { logAudit } from "@/lib/audit-log";
+import { decodeBodyMeasurement } from "@/lib/pii-helpers";
 import { revalidatePath } from "next/cache";
 
 async function ensureTrainerOwnsClient(clientId: number) {
@@ -150,7 +151,7 @@ export async function getClientMeasurements(clientId: number) {
         clientId,
         metadata: { returned: rows.length },
     });
-    return rows;
+    return rows.map(decodeBodyMeasurement);
 }
 
 export async function getClientProgressPhotos(clientId: number) {

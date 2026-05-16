@@ -8,6 +8,7 @@ import {
     uploadToR2,
 } from "@/lib/r2";
 import type { ClientSession } from "@/lib/client-auth";
+import { encodeBodyMeasurementInsert, decodeBodyMeasurement } from "@/lib/pii-helpers";
 
 export interface BodyMeasurementInput {
     date: string;
@@ -35,17 +36,19 @@ export async function addClientBodyMeasurement(
         petto_cm: input.petto_cm || null,
         braccio_cm: input.braccio_cm || null,
         coscia_cm: input.coscia_cm || null,
+        ...encodeBodyMeasurementInsert(input),
         note: input.note || null,
     });
     return { success: true as const };
 }
 
 export async function listClientBodyMeasurements(session: ClientSession) {
-    return db
+    const rows = await db
         .select()
         .from(body_measurements)
         .where(eq(body_measurements.client_id, session.id))
         .orderBy(desc(body_measurements.date));
+    return rows.map(decodeBodyMeasurement);
 }
 
 export async function deleteClientBodyMeasurement(

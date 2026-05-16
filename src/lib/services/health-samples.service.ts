@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { client_health_samples } from "@/db/schema";
 import { and, desc, eq, gte, sql } from "drizzle-orm";
+import { encodeHealthSampleValue, decodeHealthSample } from "@/lib/pii-helpers";
 
 export type HealthSampleType =
     | "weight"
@@ -69,6 +70,7 @@ export async function insertHealthSamples(
             client_id: clientId,
             type: s.type,
             value: s.value,
+            ...encodeHealthSampleValue(s.value),
             unit: s.unit,
             recorded_at: new Date(s.recorded_at),
             source: s.source,
@@ -120,7 +122,7 @@ export async function listClientHealthSamples(
         .where(and(...filters))
         .orderBy(desc(client_health_samples.recorded_at))
         .limit(2000);
-    return rows.map((r) => ({
+    return rows.map(decodeHealthSample).map((r) => ({
         id: r.id,
         type: r.type as HealthSampleType,
         value: r.value,
@@ -136,12 +138,12 @@ export async function listClientHealthSamples(
 export async function listLatestHealthSamples(
     clientId: number,
 ): Promise<Partial<Record<HealthSampleType, StoredSample>>> {
-    const rows = await db
+    const rows = (await db
         .select()
         .from(client_health_samples)
         .where(eq(client_health_samples.client_id, clientId))
         .orderBy(desc(client_health_samples.recorded_at))
-        .limit(500);
+        .limit(500)).map(decodeHealthSample);
 
     const latest: Partial<Record<HealthSampleType, StoredSample>> = {};
     for (const r of rows) {

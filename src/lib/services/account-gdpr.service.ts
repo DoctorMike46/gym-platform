@@ -22,6 +22,7 @@ import {
 } from "@/db/schema";
 import { eq, inArray, sql } from "drizzle-orm";
 import { deleteFromR2 } from "@/lib/r2";
+import { decodeBodyMeasurement } from "@/lib/pii-helpers";
 
 /**
  * Aggrega tutti i dati del cliente in un singolo oggetto JSON.
@@ -157,7 +158,7 @@ export async function exportClientData(clientId: number) {
                 (e) => e.workout_log_id === l.id
             ),
         })),
-        body_measurements: measurements,
+        body_measurements: measurements.map(decodeBodyMeasurement),
         progress_photos: photos.map((p) => ({
             ...p,
             note: "Il file binario non è incluso. Usa la funzione 'Documenti' nell'app per scaricare le foto prima della cancellazione.",
