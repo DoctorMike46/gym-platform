@@ -51,17 +51,30 @@ export async function createClient(formData: FormData) {
         return { success: true };
     } catch (error: any) {
         console.error("Errore creazione cliente:", error);
+        // Drizzle/Neon: il vero PgError è in error.cause; controlliamo entrambi.
+        const code =
+            error?.code ??
+            error?.cause?.code ??
+            error?.original?.code;
+        const fullMessage = [
+            error?.message,
+            error?.cause?.message,
+            error?.cause?.detail,
+            error?.detail,
+        ]
+            .filter(Boolean)
+            .join(" | ");
         if (
-            error?.code === "23505" ||
-            String(error?.message ?? "").includes("clients_trainer_email_idx") ||
-            String(error?.message ?? "").includes("duplicate key")
+            code === "23505" ||
+            fullMessage.includes("clients_trainer_email_idx") ||
+            fullMessage.toLowerCase().includes("duplicate key")
         ) {
             return {
                 success: false,
                 error: "Questa email è già registrata per un altro cliente.",
             };
         }
-        return { success: false, error: error.message || "Errore sconosciuto" };
+        return { success: false, error: "Errore durante la creazione del cliente. Riprova." };
     }
 }
 
