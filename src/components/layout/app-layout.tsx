@@ -22,7 +22,7 @@ export interface TrainerCounters {
     unreadMessages: number;
 }
 
-const STANDALONE_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/portal"];
+const STANDALONE_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/portal", "/legal"];
 
 export function AppLayout({
     children,

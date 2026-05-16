@@ -406,6 +406,92 @@ export async function deleteMealPlan(planId: number) {
 
 // ── AI: generazione piano alimentare ──────────────────────────────────
 
+// Schema usato per IMPORTA da PDF/foto. Include items strutturati (singoli
+// alimenti con quantità e macros) ma SENZA alternatives: il documento del
+// nutrizionista non contiene alternative; le aggiunge l'admin dopo dall'editor.
+const AI_PLAN_IMPORT_SCHEMA = {
+    name: "meal_plan_import",
+    schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["meals"],
+        properties: {
+            meals: {
+                type: "array",
+                items: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: [
+                        "giorno_settimana",
+                        "momento",
+                        "ordine",
+                        "descrizione",
+                        "kcal",
+                        "proteine_g",
+                        "carbo_g",
+                        "grassi_g",
+                        "note",
+                        "items",
+                    ],
+                    properties: {
+                        giorno_settimana: {
+                            type: "integer",
+                            minimum: 1,
+                            maximum: 7,
+                        },
+                        momento: {
+                            type: "string",
+                            enum: [
+                                "colazione",
+                                "spuntino_mat",
+                                "pranzo",
+                                "spuntino_pom",
+                                "cena",
+                                "pre_nanna",
+                            ],
+                        },
+                        ordine: { type: "integer", minimum: 0 },
+                        descrizione: { type: "string" },
+                        kcal: { type: "integer", minimum: 0 },
+                        proteine_g: { type: "integer", minimum: 0 },
+                        carbo_g: { type: "integer", minimum: 0 },
+                        grassi_g: { type: "integer", minimum: 0 },
+                        note: { type: ["string", "null"] },
+                        items: {
+                            type: "array",
+                            description:
+                                "Singoli alimenti del pasto estratti dal documento. Ogni alimento ha alimento, quantita_g e macros calcolati per quella quantità.",
+                            items: {
+                                type: "object",
+                                additionalProperties: false,
+                                required: [
+                                    "alimento",
+                                    "quantita_g",
+                                    "kcal",
+                                    "proteine_g",
+                                    "carbo_g",
+                                    "grassi_g",
+                                    "note",
+                                ],
+                                properties: {
+                                    alimento: { type: "string" },
+                                    quantita_g: { type: "integer", minimum: 0 },
+                                    kcal: { type: "integer", minimum: 0 },
+                                    proteine_g: { type: "integer", minimum: 0 },
+                                    carbo_g: { type: "integer", minimum: 0 },
+                                    grassi_g: { type: "integer", minimum: 0 },
+                                    note: { type: ["string", "null"] },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+    strict: true,
+} as const;
+
 const AI_FOOD_ITEM_SCHEMA = {
     type: "object",
     additionalProperties: false,
@@ -660,7 +746,8 @@ interface AIPlanItem {
 }
 
 interface AIPlanItemWithAlts extends AIPlanItem {
-    alternatives: AIPlanItem[];
+    // Optional: schema generate fornisce alternatives, schema import no
+    alternatives?: AIPlanItem[];
 }
 
 interface AIPlanMeal {
@@ -709,62 +796,152 @@ export async function importMealPlanFromFile(formData: FormData) {
         if (!allowed.includes(mime)) {
             return {
                 success: false as const,
-                error: "Tipo file non supportato (PDF, JPG, PNG, WEBP)",
+                error: "Tipo file non supportato. Carica un PDF o un'immagine (JPG, PNG, WEBP).",
             };
         }
         const buffer = Buffer.from(await file.arrayBuffer());
         if (buffer.length > 10 * 1024 * 1024) {
             return { success: false as const, error: "File troppo grande (max 10MB)" };
         }
-        const base64 = buffer.toString("base64");
-        const dataUri = `data:${mime};base64,${base64}`;
+        const isPdf = mime === "application/pdf";
 
-        const system = `Sei un assistente che estrae la struttura di un piano alimentare da un documento (PDF o immagine).
+        const system = `Sei un assistente che estrae e digitalizza un piano alimentare da un documento (PDF o immagine).
 
-OBIETTIVO: produrre un JSON conforme allo schema con tutti i pasti rilevati per i 7 giorni della settimana.
+OBIETTIVO: produrre un JSON conforme allo schema con tutti i pasti per i 7 giorni della settimana, ognuno strutturato in alimenti singoli con porzioni e macros.
 
 REGOLE:
-- Se il documento copre meno di 7 giorni, replica i giorni mancanti seguendo il pattern visibile.
-- Se mancano kcal o macro espliciti, stimali in base alle porzioni (numeri interi).
+- Se il documento copre meno di 7 giorni, replica i giorni mancanti seguendo il pattern visibile (se vedi solo "giorno 1" e "giorno 2", replicali per coprire tutti e 7).
+- Se mancano kcal o macros espliciti, STIMALI realisticamente in base alle porzioni indicate (numeri interi). MAI mettere 0 se non sai: stima ragionevolmente.
 - "momento" deve essere uno tra: colazione, spuntino_mat, pranzo, spuntino_pom, cena, pre_nanna. Mappa "merenda" o "snack" mattutini a spuntino_mat e pomeridiani a spuntino_pom.
 - "giorno_settimana": 1=Lunedì, 7=Domenica.
 - "ordine": parte da 0 nel primo momento di ogni giorno.
-- "descrizione": riporta porzioni in grammi quando specificate nel documento.`;
+- "descrizione": riassunto testuale del pasto (es. "80g pasta + 150g pollo + verdure miste").
+- "items": ARRAY OBBLIGATORIO di tutti gli alimenti del pasto, ognuno con alimento, quantita_g e macros propri.
+  * Estrai SOLO alimenti presenti nel documento — non inventare.
+  * Se nel documento c'è "200g yogurt greco + 30g avena + 1 banana", gli items sono 3 oggetti separati con macros di ciascuno.
+  * Se la quantità non è indicata in grammi (es. "1 banana"), stima il peso medio (banana media ≈ 120g).
+  * kcal/macros del pasto = somma esatta degli items.
+- "note": eventuali note specifiche del pasto (orario, indicazioni testuali) oppure null.
+
+NON aggiungere alternative agli items: le aggiungerà l'admin in un secondo momento.`;
 
         const openai = getOpenAIClient();
-        const response = await openai.chat.completions.create({
-            model: OPENAI_VISION_MODEL,
-            messages: [
-                { role: "system", content: system },
-                {
-                    role: "user",
-                    content: [
+        let content: string | null = null;
+        let finish: string | undefined;
+
+        if (isPdf) {
+            // PDF: upload via Files API + estrazione via Responses API.
+            // chat.completions con image_url non accetta PDF.
+            const uploaded = await openai.files.create({
+                file: new File([new Uint8Array(buffer)], file.name || "plan.pdf", {
+                    type: "application/pdf",
+                }),
+                purpose: "user_data",
+            });
+            try {
+                const r = await openai.responses.create({
+                    model: OPENAI_VISION_MODEL,
+                    input: [
+                        { role: "system", content: system },
                         {
-                            type: "text",
-                            text: "Estrai il piano alimentare contenuto in questo documento.",
-                        },
-                        {
-                            type: "image_url",
-                            image_url: { url: dataUri },
+                            role: "user",
+                            content: [
+                                {
+                                    type: "input_text",
+                                    text: "Estrai il piano alimentare contenuto in questo documento.",
+                                },
+                                {
+                                    type: "input_file",
+                                    file_id: uploaded.id,
+                                },
+                            ],
                         },
                     ],
+                    text: {
+                        format: {
+                            type: "json_schema",
+                            name: AI_PLAN_IMPORT_SCHEMA.name,
+                            schema: AI_PLAN_IMPORT_SCHEMA.schema,
+                            strict: AI_PLAN_IMPORT_SCHEMA.strict,
+                        },
+                    },
+                });
+                content = r.output_text ?? null;
+                finish = r.status === "completed" ? "stop" : r.status;
+            } finally {
+                // Best-effort cleanup del file caricato
+                openai.files
+                    .delete(uploaded.id)
+                    .catch((e) => console.warn("openai files.delete failed", e));
+            }
+        } else {
+            // Immagine: data URI base64 inline con chat.completions
+            const base64 = buffer.toString("base64");
+            const dataUri = `data:${mime};base64,${base64}`;
+            const response = await openai.chat.completions.create({
+                model: OPENAI_VISION_MODEL,
+                messages: [
+                    { role: "system", content: system },
+                    {
+                        role: "user",
+                        content: [
+                            {
+                                type: "text",
+                                text: "Estrai il piano alimentare contenuto in questo documento.",
+                            },
+                            {
+                                type: "image_url",
+                                image_url: { url: dataUri },
+                            },
+                        ],
+                    },
+                ],
+                response_format: {
+                    type: "json_schema",
+                    json_schema: AI_PLAN_IMPORT_SCHEMA,
                 },
-            ],
-            response_format: {
-                type: "json_schema",
-                json_schema: AI_PLAN_JSON_SCHEMA,
-            },
-        });
-
-        const content = response.choices[0]?.message?.content;
-        if (!content) {
-            return { success: false as const, error: "Risposta AI vuota" };
+            });
+            finish = response.choices[0]?.finish_reason ?? undefined;
+            content = response.choices[0]?.message?.content ?? null;
         }
-        const parsed = JSON.parse(content) as AIPlanResponse;
+
+        if (!content) {
+            return {
+                success: false as const,
+                error: `Risposta AI vuota (status=${finish ?? "unknown"})`,
+            };
+        }
+        if (finish !== "stop" && finish !== "completed") {
+            return {
+                success: false as const,
+                error: `Estrazione interrotta (${finish}). Il documento potrebbe essere troppo complesso: prova a caricarlo in un'immagine più nitida.`,
+            };
+        }
+        let parsed: AIPlanResponse;
+        try {
+            parsed = JSON.parse(content) as AIPlanResponse;
+        } catch (parseErr) {
+            console.error("importMealPlanFromFile parse error:", parseErr, content.slice(0, 400));
+            return {
+                success: false as const,
+                error: "L'AI ha restituito una risposta non valida. Riprova oppure usa la modalità Manuale.",
+            };
+        }
+        if (!parsed.meals || parsed.meals.length === 0) {
+            return {
+                success: false as const,
+                error: "Nessun pasto rilevato nel documento. Verifica che il file sia leggibile.",
+            };
+        }
         return { success: true as const, meals: parsed.meals };
     } catch (e) {
         console.error("importMealPlanFromFile error:", e);
-        const msg = e instanceof Error ? e.message : "Errore import";
+        // Propago il messaggio reale dall'API OpenAI se disponibile
+        const apiError = (e as { error?: { message?: string }; message?: string });
+        const msg =
+            apiError?.error?.message ||
+            apiError?.message ||
+            (e instanceof Error ? e.message : "Errore import");
         return { success: false as const, error: msg };
     }
 }

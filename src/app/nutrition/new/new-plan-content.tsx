@@ -665,8 +665,7 @@ export function NewPlanContent({ clients }: { clients: ClientLite[] }) {
                                     </div>
                                 )}
                                 <p className="text-xs text-slate-500">
-                                    L&apos;AI estrae il piano e lo digitalizza. Verifica
-                                    sempre il risultato.
+                                    Formati supportati: <strong>PDF, JPG, PNG, WEBP</strong> (max 10MB). L&apos;AI estrae i pasti e li digitalizza — verifica sempre il risultato prima di assegnarlo.
                                 </p>
                             </CardContent>
                         </Card>
