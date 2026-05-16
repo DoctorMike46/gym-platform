@@ -4,7 +4,7 @@ import { useState, useTransition, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { UserCheck, Mail, RefreshCcw, Power, Loader2 } from "lucide-react";
+import { UserCheck, Mail, RefreshCcw, Power, Loader2, Link as LinkIcon } from "lucide-react";
 import Link from "next/link";
 import {
     inviteClient,
@@ -12,6 +12,7 @@ import {
     revokePortalAccess,
     reactivatePortalAccess,
     getPortalStatus,
+    getInviteLink,
 } from "@/lib/actions/portal-clients";
 import { toast } from "sonner";
 
@@ -54,6 +55,21 @@ export function PortalAccessCard({ clientId }: { clientId: number }) {
                 toast.error(result.error || "Errore");
             }
         });
+    }
+
+    async function copyLink() {
+        const r = await getInviteLink(clientId);
+        if (!r.success) {
+            toast.error(r.error || "Errore");
+            return;
+        }
+        try {
+            await navigator.clipboard.writeText(r.url);
+            toast.success("Link invito copiato negli appunti");
+        } catch {
+            // Fallback se clipboard API non disponibile
+            window.prompt("Copia manualmente questo link:", r.url);
+        }
     }
 
     if (status === "loading") {
@@ -106,6 +122,18 @@ export function PortalAccessCard({ clientId }: { clientId: number }) {
                             >
                                 <RefreshCcw size={14} /> Reinvia invito
                             </Button>
+                            {status === "invited" && (
+                                <Button
+                                    disabled={pending}
+                                    onClick={copyLink}
+                                    size="sm"
+                                    variant="outline"
+                                    className="gap-2"
+                                    title="Copia il link di attivazione per inviarlo manualmente o testarlo"
+                                >
+                                    <LinkIcon size={14} /> Copia link
+                                </Button>
+                            )}
                             <Button
                                 disabled={pending}
                                 onClick={() => run(() => revokePortalAccess(clientId), "Accesso revocato")}

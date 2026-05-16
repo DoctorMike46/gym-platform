@@ -112,6 +112,36 @@ export async function reactivatePortalAccess(clientId: number) {
     }
 }
 
+/**
+ * Restituisce il link di onboarding corrente per un cliente non ancora
+ * attivato. Utile per testare il flow senza dipendere dalla consegna mail
+ * (Mailtrap, Resend, ecc.).
+ */
+export async function getInviteLink(clientId: number) {
+    try {
+        const { client } = await getClientForTrainer(clientId);
+        if (client.password_hash && client.password_set_at) {
+            return { success: false as const, error: "Account già attivo" };
+        }
+        if (!client.invite_token) {
+            return { success: false as const, error: "Nessun invito attivo per questo cliente. Invia prima un invito." };
+        }
+        if (
+            client.invite_token_expires_at &&
+            client.invite_token_expires_at.getTime() < Date.now()
+        ) {
+            return { success: false as const, error: "Invito scaduto. Reinvia un nuovo invito." };
+        }
+        return {
+            success: true as const,
+            url: `${APP_URL}/portal/onboarding/${client.invite_token}`,
+        };
+    } catch (e) {
+        console.error("getInviteLink error:", e);
+        return { success: false as const, error: e instanceof Error ? e.message : "Errore" };
+    }
+}
+
 export async function getPortalStatus(clientId: number) {
     const { client } = await getClientForTrainer(clientId);
     let status: "never_invited" | "invited" | "expired" | "active" | "disabled" = "never_invited";
