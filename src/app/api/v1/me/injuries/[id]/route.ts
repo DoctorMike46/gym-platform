@@ -1,10 +1,7 @@
 import { NextRequest } from "next/server";
 import { jsonError, jsonOk, requireApiClientAuth } from "@/lib/api-auth";
-import {
-    deleteInjury,
-    updateInjury,
-    type UpdateInjuryInput,
-} from "@/lib/services/injuries.service";
+import { deleteInjury, updateInjury } from "@/lib/services/injuries.service";
+import type { UpdateInjuryInput } from "@/lib/services/injuries.types";
 
 export const runtime = "nodejs";
 

@@ -7,9 +7,11 @@ import {
     deleteInjury,
     listInjuriesByClient,
     updateInjury,
-    type CreateInjuryInput,
-    type UpdateInjuryInput,
 } from "@/lib/services/injuries.service";
+import type {
+    CreateInjuryInput,
+    UpdateInjuryInput,
+} from "@/lib/services/injuries.types";
 
 export async function listClientInjuries(clientId: number, onlyActive = false) {
     const trainer = await getAuthenticatedTrainer();

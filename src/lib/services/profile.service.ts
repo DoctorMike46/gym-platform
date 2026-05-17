@@ -12,15 +12,11 @@ import { validatePassword } from "@/lib/password-policy";
 import { decryptOptional, encryptOptional } from "@/lib/crypto";
 import type { ClientSession } from "@/lib/client-auth";
 import { getLifestyle, type LifestyleData } from "./lifestyle.service";
-import {
-    getMedicalHistory,
-    type MedicalHistory,
-} from "./medical.service";
-import {
-    listInjuriesByClient,
-    type ClientInjury,
-} from "./injuries.service";
-import { getActiveRequestForClient, type NutritionRequest } from "./nutrition-requests.service";
+import { getMedicalHistory, type MedicalHistory } from "./medical.service";
+import { listInjuriesByClient } from "./injuries.service";
+import type { ClientInjury } from "./injuries.types";
+import { getActiveRequestForClient } from "./nutrition-requests.service";
+import type { NutritionRequest } from "./nutrition-requests.types";
 import type { AuditActor } from "@/lib/audit-log";
 
 export async function getClientProfile(session: ClientSession) {

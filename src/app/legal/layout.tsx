@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { headers } from "next/headers";
 import { db } from "@/db";
 import { settings } from "@/db/schema";
 import { ArrowLeft } from "lucide-react";
@@ -10,6 +11,12 @@ export default async function LegalLayout({
 }: {
     children: React.ReactNode;
 }) {
+    // L'app mobile imposta un UA custom quando apre queste pagine in WebView
+    // interna: nascondiamo header/footer perché la navigazione è gestita
+    // dall'AppBar nativa con la freccia indietro.
+    const ua = (await headers()).get("user-agent") ?? "";
+    const isEmbedded = ua.includes("GymPlatformMobile");
+
     let siteName = "Ernesto Performance";
     let primaryColor = "#003366";
     try {
@@ -20,6 +27,14 @@ export default async function LegalLayout({
         }
     } catch {
         // ignore
+    }
+
+    if (isEmbedded) {
+        return (
+            <div className="min-h-screen bg-slate-50">
+                <main className="max-w-3xl mx-auto px-6 py-8">{children}</main>
+            </div>
+        );
     }
 
     return (

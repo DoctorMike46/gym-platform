@@ -27,6 +27,7 @@ class _LegalWebViewPageState extends State<LegalWebViewPage> {
     final uri = Uri.parse('${Env.apiBaseUrl}${widget.path}');
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setUserAgent('GymPlatformMobile/1.0 (embedded webview)')
       ..setBackgroundColor(Theme.of(context).colorScheme.surface)
       ..setNavigationDelegate(
         NavigationDelegate(

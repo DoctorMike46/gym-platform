@@ -8,9 +8,11 @@ import {
     getRequestById,
     listRequestsForTrainer,
     markRequestInReview,
-    type ListRequestsFilters,
-    type NutritionRequestStatus,
 } from "@/lib/services/nutrition-requests.service";
+import type {
+    ListRequestsFilters,
+    NutritionRequestStatus,
+} from "@/lib/services/nutrition-requests.types";
 
 export async function listNutritionRequests(filters: {
     status?: NutritionRequestStatus;
