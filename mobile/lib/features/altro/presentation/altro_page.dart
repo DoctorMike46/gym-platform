@@ -76,6 +76,12 @@ class AltroPage extends ConsumerWidget {
             subtitle: 'Consensi, export dati, elimina account',
             route: '/privacy',
           ),
+          const _MenuTile(
+            icon: Icons.fingerprint,
+            title: 'Blocco biometrico',
+            subtitle: 'Sblocca l\'app con Face ID o impronta',
+            route: '/settings/biometric',
+          ),
         ],
       ),
     );

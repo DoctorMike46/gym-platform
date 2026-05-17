@@ -42,19 +42,20 @@ bool _isLocalHost(String host) {
 ///   - In **dev / debug**: soft mode → log warn, lascia passare la richiesta
 ///   - Host **locali**: pinning sempre skippato
 ///
-/// Il `SecurityContext(withTrustedRoots: false)` invalida la verifica di
-/// sistema così che TUTTI i cert finiscono in `badCertificateCallback`,
-/// dove facciamo il vero check SHA-256.
+/// Usa l'API `validateCertificate` di `IOHttpClientAdapter` (Dio 5.4+) che
+/// è chiamata **per ogni cert** prima della connessione, sia esso valido o
+/// no dal sistema. Più affidabile di `badCertificateCallback` su iOS release.
 void installCertPinning(Dio dio) {
   final strict = Env.isProd && !kDebugMode;
 
-  final adapter = IOHttpClientAdapter();
-  adapter.createHttpClient = () {
-    final ctx = SecurityContext(withTrustedRoots: false);
-    final client = HttpClient(context: ctx);
-
-    client.badCertificateCallback = (X509Certificate cert, String host, int port) {
+  final adapter = IOHttpClientAdapter(
+    validateCertificate: (X509Certificate? cert, String host, int port) {
       if (_isLocalHost(host)) return true;
+      if (cert == null) {
+        // Edge case: cert non disponibile (es. errore TLS handshake)
+        debugPrint('[cert-pinning] WARN  $host:$port — cert null');
+        return !strict;
+      }
 
       final fp = base64Encode(sha256.convert(cert.der).bytes);
       if (kAllowedCertFingerprints.contains(fp)) return true;
@@ -65,10 +66,8 @@ void installCertPinning(Dio dio) {
       }
       debugPrint('[cert-pinning] WARN  $host:$port — unexpected cert sha256=$fp (non-strict, pass)');
       return true;
-    };
-
-    return client;
-  };
+    },
+  );
 
   dio.httpClientAdapter = adapter;
 }
