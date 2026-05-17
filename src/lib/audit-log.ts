@@ -18,7 +18,8 @@ export type AuditAction =
     | "photo.write"
     | "photo.delete"
     | "gdpr.export"
-    | "gdpr.delete";
+    | "gdpr.delete"
+    | "audit_log.retention_cleanup";
 
 interface LogAuditInput {
     actor: AuditActor;
