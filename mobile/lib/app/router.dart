@@ -6,7 +6,9 @@ import '../features/altro/presentation/altro_page.dart';
 import '../features/announcements/presentation/announcements_page.dart';
 import '../features/bookings/presentation/bookings_list_page.dart';
 import '../features/bookings/presentation/new_booking_page.dart';
+import '../core/biometric/biometric_service.dart';
 import '../features/auth/presentation/auth_controller.dart';
+import '../features/auth/presentation/biometric_unlock_page.dart';
 import '../features/auth/presentation/login_page.dart';
 import '../features/auth/presentation/splash_page.dart';
 import '../features/chat/presentation/chat_page.dart';
@@ -17,6 +19,7 @@ import '../features/nutrition/presentation/nutrition_page.dart';
 import '../features/onboarding/presentation/onboarding_page.dart';
 import '../features/packages/presentation/packages_page.dart';
 import '../features/privacy/presentation/privacy_data_page.dart';
+import '../features/settings/presentation/biometric_settings_page.dart';
 import '../features/questionnaires/presentation/questionnaire_form_page.dart';
 import '../features/questionnaires/presentation/questionnaires_list_page.dart';
 import '../features/profile/presentation/profile_page.dart';
@@ -37,9 +40,10 @@ final routerProvider = Provider<GoRouter>((ref) {
     refreshListenable: notifier,
     redirect: (context, state) {
       final auth = ref.read(authControllerProvider);
+      final bio = ref.read(biometricGateControllerProvider);
       final loc = state.matchedLocation;
 
-      // Stato non ancora risolto → mostra splash
+      // Stato auth non ancora risolto → mostra splash
       if (auth.isInitial) {
         return loc == '/splash' ? null : '/splash';
       }
@@ -47,8 +51,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (!auth.isAuthenticated) {
         return loc == '/login' ? null : '/login';
       }
-      // Autenticato → home (se ancora su splash/login)
-      if (loc == '/splash' || loc == '/login') {
+      // Autenticato — controllo biometric gate (H7)
+      if (bio == BiometricGateState.initial) {
+        return loc == '/splash' ? null : '/splash';
+      }
+      if (bio == BiometricGateState.locked) {
+        return loc == '/biometric-unlock' ? null : '/biometric-unlock';
+      }
+      // bio: disabled o unlocked → libero
+      if (loc == '/splash' || loc == '/login' || loc == '/biometric-unlock') {
         return '/home';
       }
       return null;
@@ -61,6 +72,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginPage(),
+      ),
+      GoRoute(
+        path: '/biometric-unlock',
+        builder: (context, state) => const BiometricUnlockPage(),
       ),
       GoRoute(
         path: '/onboarding-tour',
@@ -171,6 +186,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const PrivacyDataPage(),
       ),
       GoRoute(
+        path: '/settings/biometric',
+        builder: (context, state) => const BiometricSettingsPage(),
+      ),
+      GoRoute(
         path: '/chat',
         builder: (context, state) => const ChatPage(),
       ),
@@ -180,17 +199,22 @@ final routerProvider = Provider<GoRouter>((ref) {
 
 class _AuthRefreshNotifier extends ChangeNotifier {
   _AuthRefreshNotifier(this._ref) {
-    _sub = _ref.listen(authControllerProvider, (_, _) {
+    _authSub = _ref.listen(authControllerProvider, (_, _) {
+      notifyListeners();
+    });
+    _bioSub = _ref.listen(biometricGateControllerProvider, (_, _) {
       notifyListeners();
     });
   }
 
   final Ref _ref;
-  late final ProviderSubscription _sub;
+  late final ProviderSubscription _authSub;
+  late final ProviderSubscription _bioSub;
 
   @override
   void dispose() {
-    _sub.close();
+    _authSub.close();
+    _bioSub.close();
     super.dispose();
   }
 }

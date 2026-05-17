@@ -5,6 +5,7 @@ import '../auth/forced_logout_signal.dart';
 import '../config/env.dart';
 import '../storage/secure_storage.dart';
 import 'auth_interceptor.dart';
+import 'cert_pinning.dart';
 
 /// Provider del Dio principale con auth interceptor (bearer + refresh).
 final dioProvider = Provider<Dio>((ref) {
@@ -20,6 +21,7 @@ final dioProvider = Provider<Dio>((ref) {
       responseType: ResponseType.json,
     ),
   );
+  installCertPinning(refreshClient);
 
   // validateStatus default (status < 400 → success) così:
   // - 401 lancia DioException → auth interceptor lo intercetta e fa il refresh
@@ -34,6 +36,7 @@ final dioProvider = Provider<Dio>((ref) {
       responseType: ResponseType.json,
     ),
   );
+  installCertPinning(dio);
 
   dio.interceptors.add(
     AuthInterceptor(

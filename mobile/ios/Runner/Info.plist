@@ -28,6 +28,8 @@
 	<true/>
 	<key>NSCameraUsageDescription</key>
 	<string>L'app ha bisogno della fotocamera per scattare foto progresso del tuo allenamento.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>L'app usa Face ID per sbloccare l'accesso al tuo profilo in modo rapido e sicuro.</string>
 	<key>NSHealthShareUsageDescription</key>
 	<string>L'app legge i tuoi dati di salute (peso, passi, frequenza cardiaca, calorie attive) per sincronizzarli con il tuo profilo e mostrarli al tuo trainer.</string>
 	<key>NSHealthUpdateUsageDescription</key>

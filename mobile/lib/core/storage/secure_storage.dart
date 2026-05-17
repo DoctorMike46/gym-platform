@@ -9,6 +9,7 @@ class SecureStorage {
   static const _kClientId = 'client_id';
   static const _kThemeMode = 'theme_mode';
   static const _kOnboardingDone = 'onboarding_done';
+  static const _kBiometricEnabled = 'biometric_enabled';
 
   final FlutterSecureStorage _storage;
 
@@ -45,6 +46,15 @@ class SecureStorage {
 
   Future<void> markOnboardingDone() =>
       _storage.write(key: _kOnboardingDone, value: '1');
+
+  /// H7 — opt-in biometric lock. Default OFF.
+  Future<bool> isBiometricEnabled() async {
+    final v = await _storage.read(key: _kBiometricEnabled);
+    return v == '1';
+  }
+
+  Future<void> setBiometricEnabled(bool enabled) =>
+      _storage.write(key: _kBiometricEnabled, value: enabled ? '1' : '0');
 
   Future<void> clearSession() async {
     await Future.wait([
