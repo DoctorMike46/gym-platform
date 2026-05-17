@@ -41,16 +41,25 @@ import { PortalAccessCard } from "@/components/clients/portal-access-card";
 import { ClientHealthCard } from "@/components/clients/health-card";
 import { toast } from "sonner";
 
+import { InjuryBanner } from "@/components/workouts/injury-banner";
+import { InjuryAckModal } from "@/components/workouts/injury-ack-modal";
+import { ClientInjuriesCard } from "@/components/clients/injuries-card";
+import type { ClientInjury } from "@/lib/services/injuries.service";
+
 export default function ClientDetailContent({
     client,
     services,
     templates,
     mealPlan,
+    injuries,
+    activeInjuries,
 }: {
     client: any;
     services: any[];
     templates: any[];
     mealPlan: { plan: any; meals: any[] } | null;
+    injuries: ClientInjury[];
+    activeInjuries: ClientInjury[];
 }) {
     const router = useRouter();
     // Edit Profile
@@ -64,6 +73,9 @@ export default function ClientDetailContent({
 
     // Workouts
     const [isAssignWorkoutOpen, setIsAssignWorkoutOpen] = useState(false);
+    const [pendingTemplateId, setPendingTemplateId] = useState<number | null>(null);
+    const [isInjuryAckOpen, setIsInjuryAckOpen] = useState(false);
+    const [assigning, setAssigning] = useState(false);
 
     // Anamnesi upload
     const [isAnamnesiOpen, setIsAnamnesiOpen] = useState(false);
@@ -178,24 +190,44 @@ export default function ClientDetailContent({
     }
 
     // Workouts Handlers
+    async function performAssign(templateId: number, ack: boolean) {
+        setAssigning(true);
+        try {
+            const result = await assignWorkoutToClient({
+                client_id: client.id,
+                template_id: templateId,
+                injury_ack: ack,
+            });
+
+            if (result.success) {
+                setIsAssignWorkoutOpen(false);
+                setIsInjuryAckOpen(false);
+                setPendingTemplateId(null);
+                toast.success("Scheda assegnata con successo!");
+                router.refresh();
+                return;
+            }
+
+            if ("error" in result && result.error === "requires_injury_ack") {
+                // Apri modal ack — la richiesta verrà ritentata da onConfirm
+                setPendingTemplateId(templateId);
+                setIsInjuryAckOpen(true);
+                return;
+            }
+
+            toast.error(result.error || "Errore nell'assegnazione.");
+        } finally {
+            setAssigning(false);
+        }
+    }
+
     async function handleAssignWorkout(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
         const templateId = fd.get("template_id");
         if (!templateId) return;
 
-        const result = await assignWorkoutToClient({
-            client_id: client.id,
-            template_id: parseInt(templateId as string),
-        });
-
-        if (result.success) {
-            setIsAssignWorkoutOpen(false);
-            toast.success("Scheda assegnata con successo!");
-            router.refresh();
-        } else {
-            toast.error(result.error || "Errore nell'assegnazione.");
-        }
+        await performAssign(parseInt(templateId as string), false);
     }
 
     async function handleRemoveWorkout(assignmentId: number) {
@@ -249,6 +281,12 @@ export default function ClientDetailContent({
     return (
         <TooltipProvider delayDuration={300}>
             <div className="space-y-6 max-w-5xl">
+                {activeInjuries.length > 0 && (
+                    <InjuryBanner
+                        injuries={activeInjuries}
+                        clientName={`${client.nome} ${client.cognome}`}
+                    />
+                )}
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
                     <div className="flex items-center gap-3 min-w-0">
@@ -296,6 +334,9 @@ export default function ClientDetailContent({
 
                         {/* Salute & biometria (sync da Apple Health / Health Connect) */}
                         <ClientHealthCard clientId={client.id} />
+
+                        {/* Infortuni */}
+                        <ClientInjuriesCard clientId={client.id} injuries={injuries} />
 
                         {/* Schede di Allenamento */}
                         <Card className="bg-white border-slate-200 shadow-sm">
@@ -813,11 +854,24 @@ export default function ClientDetailContent({
                             </div>
                             <DialogFooter>
                                 <Button type="button" variant="outline" onClick={() => setIsAssignWorkoutOpen(false)}>Annulla</Button>
-                                <Button type="submit" className="brand-bg text-white">Assegna</Button>
+                                <Button type="submit" className="brand-bg text-white" disabled={assigning}>Assegna</Button>
                             </DialogFooter>
                         </form>
                     </DialogContent>
                 </Dialog>
+
+                <InjuryAckModal
+                    open={isInjuryAckOpen}
+                    onOpenChange={(v) => {
+                        setIsInjuryAckOpen(v);
+                        if (!v) setPendingTemplateId(null);
+                    }}
+                    injuries={activeInjuries}
+                    busy={assigning}
+                    onConfirm={() => {
+                        if (pendingTemplateId !== null) performAssign(pendingTemplateId, true);
+                    }}
+                />
 
             </div>
         </TooltipProvider>

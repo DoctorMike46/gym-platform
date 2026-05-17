@@ -246,6 +246,28 @@ export async function createMealPlan(
             })
             .returning({ id: meal_plans.id });
 
+        // Se questo piano è stato creato a partire da una richiesta del cliente,
+        // chiudila come approved + linka il piano. Errori qui non rollback-ano il piano.
+        const linkedRequestRaw = formData.get("linked_request_id");
+        const linkedRequestId =
+            linkedRequestRaw !== null ? parseIntOrNull(linkedRequestRaw) : null;
+        if (linkedRequestId !== null) {
+            try {
+                const { linkRequestToMealPlan } = await import(
+                    "@/lib/services/nutrition-requests.service"
+                );
+                await linkRequestToMealPlan(linkedRequestId, trainer.id, inserted.id, {
+                    type: "trainer",
+                    id: trainer.id,
+                });
+            } catch (err) {
+                console.error("[nutrition] failed to link request to meal plan", {
+                    linkedRequestId,
+                    err,
+                });
+            }
+        }
+
         revalidatePath(`/clients/${clientId}`);
         revalidatePath("/nutrition");
         return { success: true, id: inserted.id };

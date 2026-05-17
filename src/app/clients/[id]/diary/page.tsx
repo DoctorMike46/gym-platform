@@ -38,7 +38,7 @@ export default async function ClientDiaryPage({
             </Link>
 
             <div>
-                <h1 className="text-2xl md:text-3xl font-black text-slate-900">
+                <h1 className="text-2xl md:text-3xl font-black brand-text">
                     Diario di {client.nome} {client.cognome}
                 </h1>
                 <p className="text-slate-500 text-sm mt-1">Allenamenti loggati e progressi</p>

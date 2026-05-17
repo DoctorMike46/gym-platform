@@ -19,10 +19,16 @@ import {
     client_refresh_tokens,
     client_devices,
     client_password_reset_tokens,
+    client_injuries,
+    client_lifestyle,
+    client_medical_history,
+    client_nutrition_profile,
+    nutrition_requests,
 } from "@/db/schema";
 import { eq, inArray, sql } from "drizzle-orm";
 import { deleteFromR2 } from "@/lib/r2";
 import { decodeBodyMeasurement } from "@/lib/pii-helpers";
+import { decryptOptional } from "@/lib/crypto";
 
 /**
  * Aggrega tutti i dati del cliente in un singolo oggetto JSON.
@@ -126,6 +132,127 @@ export async function exportClientData(clientId: number) {
                 .where(inArray(meal_plan_meals.meal_plan_id, planIds))
             : [];
 
+    const [nutritionProfile] = await db
+        .select()
+        .from(client_nutrition_profile)
+        .where(eq(client_nutrition_profile.client_id, clientId))
+        .limit(1);
+
+    const [lifestyle] = await db
+        .select()
+        .from(client_lifestyle)
+        .where(eq(client_lifestyle.client_id, clientId))
+        .limit(1);
+
+    const [medical] = await db
+        .select()
+        .from(client_medical_history)
+        .where(eq(client_medical_history.client_id, clientId))
+        .limit(1);
+
+    const injuries = await db
+        .select()
+        .from(client_injuries)
+        .where(eq(client_injuries.client_id, clientId));
+
+    const nutritionReqs = await db
+        .select()
+        .from(nutrition_requests)
+        .where(eq(nutrition_requests.client_id, clientId));
+
+    const safeDec = (v: string | null | undefined) => {
+        try {
+            return decryptOptional(v);
+        } catch {
+            return null;
+        }
+    };
+
+    const medicalDecoded = medical
+        ? {
+              patologie: safeDec(medical.patologie_enc),
+              farmaci: safeDec(medical.farmaci_enc),
+              note: safeDec(medical.note_enc),
+              disclaimer_accepted_at: medical.disclaimer_accepted_at,
+              created_at: medical.created_at,
+              updated_at: medical.updated_at,
+          }
+        : null;
+
+    const lifestyleDecoded = lifestyle
+        ? {
+              ore_sonno_medie: lifestyle.ore_sonno_medie,
+              livello_stress: lifestyle.livello_stress,
+              n_pasti_die: lifestyle.n_pasti_die,
+              orari_pasti: lifestyle.orari_pasti,
+              occasioni_sociali_settimana: lifestyle.occasioni_sociali_settimana,
+              consumo_acqua_litri: safeDec(lifestyle.consumo_acqua_litri_enc) ?? lifestyle.consumo_acqua_litri,
+              fumo: lifestyle.fumo,
+              integratori: lifestyle.integratori,
+              created_at: lifestyle.created_at,
+              updated_at: lifestyle.updated_at,
+          }
+        : null;
+
+    const injuriesDecoded = injuries.map((i) => ({
+        id: i.id,
+        parte_corpo: i.parte_corpo,
+        tipo: i.tipo,
+        gravita: i.gravita,
+        stato: i.stato,
+        data_evento: i.data_evento,
+        data_recupero: i.data_recupero,
+        note: safeDec(i.note_enc),
+        created_at: i.created_at,
+    }));
+
+    const nutritionProfileDecoded = nutritionProfile
+        ? {
+              sesso: nutritionProfile.sesso,
+              livello_attivita: nutritionProfile.livello_attivita,
+              obiettivo_default: nutritionProfile.obiettivo_default,
+              regime_alimentare: nutritionProfile.regime_alimentare,
+              allergeni: nutritionProfile.allergeni,
+              intolleranze: nutritionProfile.intolleranze_json ?? nutritionProfile.intolleranze,
+              preferenze_alimenti: nutritionProfile.preferenze_alimenti,
+              esclusioni_alimenti: nutritionProfile.esclusioni_alimenti,
+              obiettivo_timeframe_settimane: nutritionProfile.obiettivo_timeframe_settimane,
+              peso_target_kg: safeDec(nutritionProfile.peso_target_kg_enc),
+              motivazione: nutritionProfile.motivazione,
+              note_aggiuntive: nutritionProfile.note_aggiuntive,
+              created_at: nutritionProfile.created_at,
+              updated_at: nutritionProfile.updated_at,
+          }
+        : null;
+
+    const nutritionReqsDecoded = nutritionReqs.map((r) => ({
+        id: r.id,
+        status: r.status,
+        obiettivo: r.obiettivo,
+        timeframe_settimane: r.timeframe_settimane,
+        peso_target_kg: safeDec(r.peso_target_kg_enc),
+        motivazione: r.motivazione,
+        regime_alimentare: r.regime_alimentare,
+        allergeni: r.allergeni,
+        intolleranze: r.intolleranze,
+        cibi_preferiti: r.cibi_preferiti,
+        cibi_evitati: r.cibi_evitati,
+        n_pasti_die: r.n_pasti_die,
+        orari_pasti: r.orari_pasti,
+        occasioni_sociali: r.occasioni_sociali,
+        ore_sonno: r.ore_sonno,
+        livello_stress: r.livello_stress,
+        consumo_acqua_litri: safeDec(r.consumo_acqua_litri_enc),
+        fumo: r.fumo,
+        integratori: r.integratori,
+        patologie: safeDec(r.patologie_enc),
+        farmaci: safeDec(r.farmaci_enc),
+        note_libere: safeDec(r.note_libere_enc),
+        linked_meal_plan_id: r.linked_meal_plan_id,
+        requested_at: r.requested_at,
+        decided_at: r.decided_at,
+    }));
+
     return {
         exported_at: new Date().toISOString(),
         format_version: 1,
@@ -178,6 +305,11 @@ export async function exportClientData(clientId: number) {
             ...p,
             meals: meals.filter((m) => m.meal_plan_id === p.id),
         })),
+        nutrition_profile: nutritionProfileDecoded,
+        lifestyle: lifestyleDecoded,
+        medical_history: medicalDecoded,
+        injuries: injuriesDecoded,
+        nutrition_requests: nutritionReqsDecoded,
     };
 }
 

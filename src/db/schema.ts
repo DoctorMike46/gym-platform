@@ -394,12 +394,146 @@ export const client_nutrition_profile = pgTable(
     regime_alimentare: text("regime_alimentare"), // 'onnivoro' | 'vegetariano' | 'vegano' | 'pescetariano' | 'altro'
     allergeni: jsonb("allergeni"),
     intolleranze: text("intolleranze"),
+    // Migrazione: array strutturato; sostituirà `intolleranze` text in una release futura.
+    intolleranze_json: jsonb("intolleranze_json"),
     preferenze_alimenti: jsonb("preferenze_alimenti"),
     esclusioni_alimenti: jsonb("esclusioni_alimenti"),
+    // Obiettivo esteso (richiesta piano alimentare).
+    obiettivo_timeframe_settimane: integer("obiettivo_timeframe_settimane"),
+    peso_target_kg_enc: text("peso_target_kg_enc"), // GDPR art.9
+    motivazione: text("motivazione"),
     note_aggiuntive: text("note_aggiuntive"),
     created_at: timestamp("created_at").defaultNow().notNull(),
     updated_at: timestamp("updated_at").defaultNow().notNull(),
   }
+);
+
+// ─── Client Lifestyle (1-a-1 con clients) ──────────────────
+// Abitudini e stile di vita auto-dichiarati. Usati per personalizzare piani.
+export const client_lifestyle = pgTable(
+  "client_lifestyle",
+  {
+    id: serial("id").primaryKey(),
+    client_id: integer("client_id")
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull()
+      .unique(),
+    trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+    ore_sonno_medie: integer("ore_sonno_medie"),
+    livello_stress: integer("livello_stress"), // 1..10 auto-dichiarato
+    n_pasti_die: integer("n_pasti_die"),
+    orari_pasti: jsonb("orari_pasti"), // ["08:00","13:00",...]
+    occasioni_sociali_settimana: integer("occasioni_sociali_settimana"),
+    consumo_acqua_litri: text("consumo_acqua_litri"),
+    consumo_acqua_litri_enc: text("consumo_acqua_litri_enc"), // GDPR shadow
+    fumo: text("fumo"), // 'no' | 'si' | 'ex'
+    integratori: jsonb("integratori"), // [{ nome, dosaggio }]
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  }
+);
+
+// ─── Client Medical History (1-a-1 con clients) ─────────────
+// GDPR art.9 — tutti i campi testo medici sono cifrati di default.
+export const client_medical_history = pgTable(
+  "client_medical_history",
+  {
+    id: serial("id").primaryKey(),
+    client_id: integer("client_id")
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull()
+      .unique(),
+    trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+    patologie_enc: text("patologie_enc"),
+    farmaci_enc: text("farmaci_enc"),
+    note_enc: text("note_enc"),
+    disclaimer_accepted_at: timestamp("disclaimer_accepted_at"),
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  }
+);
+
+// ─── Client Injuries (N per cliente) ────────────────────────
+// Infortuni attivi/recuperati. Mostrati nel builder schede per sicurezza.
+// parte_corpo: 'spalla_sx'|'spalla_dx'|'gomito_sx'|'gomito_dx'|'polso_sx'|'polso_dx'
+//              |'schiena_lombare'|'schiena_cervicale'|'schiena_dorsale'
+//              |'anca_sx'|'anca_dx'|'ginocchio_sx'|'ginocchio_dx'|'caviglia_sx'|'caviglia_dx'
+//              |'piede'|'mano'|'collo'|'altro'
+// tipo: 'muscolare' | 'articolare' | 'tendine' | 'osseo' | 'altro'
+// gravita: 'leggera' | 'media' | 'grave'
+// stato: 'attivo' | 'recuperato'
+export const client_injuries = pgTable(
+  "client_injuries",
+  {
+    id: serial("id").primaryKey(),
+    client_id: integer("client_id")
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
+    trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+    parte_corpo: text("parte_corpo").notNull(),
+    tipo: text("tipo"),
+    gravita: text("gravita").notNull(),
+    stato: text("stato").default("attivo").notNull(),
+    data_evento: date("data_evento"),
+    data_recupero: date("data_recupero"),
+    note_enc: text("note_enc"), // GDPR art.9
+    created_at: timestamp("created_at").defaultNow().notNull(),
+    updated_at: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (t) => ({
+    clientStatoIdx: index("client_injuries_client_stato_idx").on(t.client_id, t.stato),
+    trainerStatoIdx: index("client_injuries_trainer_stato_idx").on(t.trainer_id, t.stato),
+  })
+);
+
+// ─── Nutrition Requests (richieste piano alimentare da client a trainer) ──
+// Snapshot del wizard mobile cliente. Stato workflow: pending → in_review → approved/declined.
+// I campi *_enc sono cifrati art.9 (dati medici/sanitari).
+export const nutrition_requests = pgTable(
+  "nutrition_requests",
+  {
+    id: serial("id").primaryKey(),
+    client_id: integer("client_id")
+      .references(() => clients.id, { onDelete: 'cascade' })
+      .notNull(),
+    trainer_id: integer("trainer_id").references(() => trainers.id).notNull(),
+    status: text("status").default("pending").notNull(), // 'pending'|'in_review'|'approved'|'declined'
+    // Snapshot obiettivo
+    obiettivo: text("obiettivo"),
+    timeframe_settimane: integer("timeframe_settimane"),
+    peso_target_kg_enc: text("peso_target_kg_enc"),
+    motivazione: text("motivazione"),
+    // Snapshot nutrizione
+    regime_alimentare: text("regime_alimentare"),
+    allergeni: jsonb("allergeni"),
+    intolleranze: jsonb("intolleranze"),
+    cibi_preferiti: jsonb("cibi_preferiti"),
+    cibi_evitati: jsonb("cibi_evitati"),
+    n_pasti_die: integer("n_pasti_die"),
+    orari_pasti: jsonb("orari_pasti"),
+    occasioni_sociali: integer("occasioni_sociali"),
+    // Snapshot lifestyle
+    ore_sonno: integer("ore_sonno"),
+    livello_stress: integer("livello_stress"),
+    consumo_acqua_litri_enc: text("consumo_acqua_litri_enc"),
+    fumo: text("fumo"),
+    integratori: jsonb("integratori"),
+    // Snapshot medico (art.9)
+    patologie_enc: text("patologie_enc"),
+    farmaci_enc: text("farmaci_enc"),
+    note_libere_enc: text("note_libere_enc"),
+    // Workflow trainer
+    trainer_decline_reason: text("trainer_decline_reason"),
+    trainer_internal_note: text("trainer_internal_note"),
+    linked_meal_plan_id: integer("linked_meal_plan_id").references(() => meal_plans.id, { onDelete: 'set null' }),
+    requested_at: timestamp("requested_at").defaultNow().notNull(),
+    reviewed_at: timestamp("reviewed_at"),
+    decided_at: timestamp("decided_at"),
+  },
+  (t) => ({
+    trainerStatusIdx: index("nutrition_requests_trainer_status_idx").on(t.trainer_id, t.status, t.requested_at),
+    clientStatusIdx: index("nutrition_requests_client_status_idx").on(t.client_id, t.status),
+  })
 );
 
 // ─── Foods Cache (Open Food Facts lookup cache) ──────────────────
@@ -768,6 +902,27 @@ export const announcementRecipientsRelations = relations(announcement_recipients
 export const documentsRelations = relations(documents, ({ one }) => ({
   trainer: one(trainers, { fields: [documents.trainer_id], references: [trainers.id] }),
   client: one(clients, { fields: [documents.client_id], references: [clients.id] }),
+}));
+
+export const clientLifestyleRelations = relations(client_lifestyle, ({ one }) => ({
+  client: one(clients, { fields: [client_lifestyle.client_id], references: [clients.id] }),
+  trainer: one(trainers, { fields: [client_lifestyle.trainer_id], references: [trainers.id] }),
+}));
+
+export const clientMedicalHistoryRelations = relations(client_medical_history, ({ one }) => ({
+  client: one(clients, { fields: [client_medical_history.client_id], references: [clients.id] }),
+  trainer: one(trainers, { fields: [client_medical_history.trainer_id], references: [trainers.id] }),
+}));
+
+export const clientInjuriesRelations = relations(client_injuries, ({ one }) => ({
+  client: one(clients, { fields: [client_injuries.client_id], references: [clients.id] }),
+  trainer: one(trainers, { fields: [client_injuries.trainer_id], references: [trainers.id] }),
+}));
+
+export const nutritionRequestsRelations = relations(nutrition_requests, ({ one }) => ({
+  client: one(clients, { fields: [nutrition_requests.client_id], references: [clients.id] }),
+  trainer: one(trainers, { fields: [nutrition_requests.trainer_id], references: [trainers.id] }),
+  linked_meal_plan: one(meal_plans, { fields: [nutrition_requests.linked_meal_plan_id], references: [meal_plans.id] }),
 }));
 
 // ─── Audit Logs (GDPR art.9 — tracciamento accessi a dati sanitari) ──

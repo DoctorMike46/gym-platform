@@ -23,6 +23,9 @@ import '../features/settings/presentation/biometric_settings_page.dart';
 import '../features/questionnaires/presentation/questionnaire_form_page.dart';
 import '../features/questionnaires/presentation/questionnaires_list_page.dart';
 import '../features/profile/presentation/profile_page.dart';
+import '../features/profile/presentation/injuries_page.dart';
+import '../features/nutrition/presentation/nutrition_request_wizard.dart';
+import '../features/legal/presentation/legal_web_view_page.dart';
 import '../features/progress/presentation/progress_page.dart';
 import '../features/subscriptions/presentation/subscriptions_page.dart';
 import '../features/workouts/presentation/assignment_detail_page.dart';
@@ -182,8 +185,30 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ProfilePage(),
       ),
       GoRoute(
+        path: '/profile/injuries',
+        builder: (context, state) => const InjuriesPage(),
+      ),
+      GoRoute(
+        path: '/nutrition/request',
+        builder: (context, state) => const NutritionRequestWizardPage(),
+      ),
+      GoRoute(
         path: '/privacy',
         builder: (context, state) => const PrivacyDataPage(),
+      ),
+      GoRoute(
+        path: '/legal/privacy',
+        builder: (context, state) => const LegalWebViewPage(
+          path: '/legal/privacy',
+          title: 'Informativa privacy',
+        ),
+      ),
+      GoRoute(
+        path: '/legal/terms',
+        builder: (context, state) => const LegalWebViewPage(
+          path: '/legal/terms',
+          title: 'Termini di servizio',
+        ),
       ),
       GoRoute(
         path: '/settings/biometric',

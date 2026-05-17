@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "db:migrate": "tsx scripts/migrate.ts",
-    "db:migrate:mobile-api": "tsx scripts/apply-mobile-api-migration.ts"
+    "db:migrate:mobile-api": "tsx scripts/apply-mobile-api-migration.ts",
+    "db:migrate:nutrition-profile-extended": "tsx scripts/apply-nutrition-profile-extended-migration.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1003.0",

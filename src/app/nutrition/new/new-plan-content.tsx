@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -53,11 +53,16 @@ type Mode = "manual" | "ai" | "import";
 
 export function NewPlanContent({ clients }: { clients: ClientLite[] }) {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [pending, startTransition] = useTransition();
     const [mode, setMode] = useState<Mode>("manual");
     const [profileDialogOpen, setProfileDialogOpen] = useState(false);
 
-    const [clientId, setClientId] = useState("");
+    // Se arriviamo da "Crea piano" su una richiesta cliente: pre-seleziona client
+    // e linka la richiesta in modo che venga chiusa come approved al submit.
+    const linkedRequestId = searchParams.get("request_id");
+    const initialClientId = searchParams.get("client_id") ?? "";
+    const [clientId, setClientId] = useState(initialClientId);
     const [clientData, setClientData] = useState<ClientNutritionFullData | null>(null);
     const [loadingClient, setLoadingClient] = useState(false);
 
@@ -195,6 +200,7 @@ export function NewPlanContent({ clients }: { clients: ClientLite[] }) {
             if (proteineG) fd.append("proteine_g", proteineG);
             if (carboG) fd.append("carbo_g", carboG);
             if (grassiG) fd.append("grassi_g", grassiG);
+            if (linkedRequestId) fd.append("linked_request_id", linkedRequestId);
 
             // 1. Crea piano
             const r = await createMealPlan(parseInt(clientId, 10), fd);

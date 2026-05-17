@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:go_router/go_router.dart';
+
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_radius.dart';
+import '../../../core/theme/app_spacing.dart';
+import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/skeleton.dart';
 import '../../../core/widgets/top_bar_actions.dart';
 import '../data/nutrition_repository.dart';
+import '../data/nutrition_request_repository.dart';
+import '../domain/nutrition_request.dart';
 
 class NutritionPage extends ConsumerStatefulWidget {
   const NutritionPage({super.key});
@@ -417,38 +422,144 @@ class _MealMacroChip extends StatelessWidget {
   }
 }
 
-class _EmptyState extends StatelessWidget {
+class _EmptyState extends ConsumerWidget {
   const _EmptyState();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final reqAsync = ref.watch(activeNutritionRequestProvider);
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        ref.invalidate(activeNutritionRequestProvider);
+        ref.invalidate(currentMealPlanProvider);
+      },
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(24, 60, 24, 32),
+        children: [
+          Icon(
+            Icons.restaurant_rounded,
+            size: 64,
+            color: theme.colorScheme.primary.withValues(alpha: 0.4),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Text(
+            'Nessun piano alimentare',
+            style: theme.textTheme.headlineSmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Il tuo trainer non ti ha ancora assegnato un piano.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium,
+          ),
+          const SizedBox(height: AppSpacing.xxl),
+          reqAsync.when(
+            loading: () => const SizedBox.shrink(),
+            error: (_, __) => const SizedBox.shrink(),
+            data: (req) => req != null && req.isActive
+                ? _RequestStatusCard(request: req)
+                : _RequestCta(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RequestCta extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.2),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'Richiedi un piano su misura',
+            style: theme.textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Ti faremo qualche domanda su obiettivi, alimentazione e abitudini. Il trainer userà queste informazioni per costruire un piano per te.',
+            style: theme.textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          PrimaryButton(
+            label: 'Inizia richiesta',
+            icon: Icons.send_rounded,
+            onPressed: () => context.push('/nutrition/request'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RequestStatusCard extends StatelessWidget {
+  const _RequestStatusCard({required this.request});
+  final NutritionRequest request;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ListView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.fromLTRB(32, 80, 32, 32),
-      children: [
-        Column(
-          children: [
-            Icon(
-              Icons.restaurant_rounded,
-              size: 64,
-              color: theme.colorScheme.primary.withValues(alpha: 0.4),
-            ),
-            const SizedBox(height: 16),
+    final isPending = request.status == NutritionRequestStatus.pending;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: theme.colorScheme.primary.withValues(alpha: 0.25),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                isPending ? Icons.schedule_rounded : Icons.hourglass_top_rounded,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  request.status.label,
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            isPending
+                ? 'La tua richiesta è in coda. Il trainer la prenderà in carico al più presto.'
+                : 'Il trainer sta lavorando al tuo piano alimentare.',
+            style: theme.textTheme.bodyMedium,
+          ),
+          if (request.obiettivo != null) ...[
+            const SizedBox(height: AppSpacing.md),
             Text(
-              'Nessun piano alimentare',
-              style: theme.textTheme.headlineSmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Il tuo trainer non ti ha ancora assegnato un piano. Quando lo farà lo vedrai qui.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium,
+              'Obiettivo: ${request.obiettivo}',
+              style: theme.textTheme.bodySmall,
             ),
           ],
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

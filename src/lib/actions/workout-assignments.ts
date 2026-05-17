@@ -8,6 +8,7 @@ import { getAuthenticatedTrainer } from "@/lib/auth";
 import { sendWorkoutAssignmentEmail } from "@/lib/email";
 import { generateWorkoutPDFBuffer } from "@/lib/pdf-server";
 import { uploadToR2, generateR2Key } from "@/lib/r2";
+import { countActiveInjuries } from "@/lib/services/injuries.service";
 
 export async function getAllWorkoutTemplates() {
     const trainer = await getAuthenticatedTrainer();
@@ -25,6 +26,12 @@ export async function assignWorkoutToClient(data: {
     client_id: number;
     template_id: number;
     note?: string;
+    /**
+     * Conferma esplicita che il trainer ha considerato gli infortuni attivi
+     * del cliente. Obbligatoria se countActiveInjuries > 0. La UI mostra modal
+     * con la lista degli infortuni; questo flag viene settato dal click "Conferma".
+     */
+    injury_ack?: boolean;
 }) {
     const trainer = await getAuthenticatedTrainer();
     try {
@@ -33,6 +40,16 @@ export async function assignWorkoutToClient(data: {
             where: and(eq(clients.id, data.client_id), eq(clients.trainer_id, trainer.id)),
         });
         if (!client) return { success: false, error: "Cliente non trovato" };
+
+        // 1b. Gating infortuni: il trainer deve confermare di averli considerati
+        const activeInjuries = await countActiveInjuries(data.client_id);
+        if (activeInjuries > 0 && !data.injury_ack) {
+            return {
+                success: false as const,
+                error: "requires_injury_ack",
+                active_injuries: activeInjuries,
+            };
+        }
 
         const template = await db.query.workout_templates.findFirst({
             where: and(eq(workout_templates.id, data.template_id), eq(workout_templates.trainer_id, trainer.id)),

@@ -36,7 +36,7 @@ export default async function TrainerWorkoutLogDetailPage({
             </Link>
 
             <div>
-                <h1 className="text-2xl md:text-3xl font-black text-slate-900">
+                <h1 className="text-2xl md:text-3xl font-black brand-text">
                     Sessione di {data.client.nome} {data.client.cognome}
                 </h1>
                 <p className="text-slate-500 text-sm mt-1">

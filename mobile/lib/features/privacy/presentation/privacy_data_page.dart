@@ -3,10 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/config/env.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_radius.dart';
@@ -32,15 +31,13 @@ class PrivacyDataPage extends ConsumerWidget {
             icon: Icons.shield_outlined,
             title: 'Informativa privacy',
             subtitle: 'Come trattiamo i tuoi dati',
-            onTap: () => _openWeb(context, '/legal/privacy'),
-            trailingIcon: Icons.open_in_new_rounded,
+            onTap: () => context.push('/legal/privacy'),
           ),
           _Tile(
             icon: Icons.description_outlined,
             title: 'Termini di servizio',
             subtitle: 'Regole di utilizzo dell\'app',
-            onTap: () => _openWeb(context, '/legal/terms'),
-            trailingIcon: Icons.open_in_new_rounded,
+            onTap: () => context.push('/legal/terms'),
           ),
 
           const SizedBox(height: 16),
@@ -81,16 +78,6 @@ class PrivacyDataPage extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  Future<void> _openWeb(BuildContext context, String path) async {
-    final uri = Uri.parse('${Env.apiBaseUrl}$path');
-    final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Impossibile aprire il link')),
-      );
-    }
   }
 
   Future<void> _exportData(BuildContext context, WidgetRef ref) async {
@@ -580,7 +567,6 @@ class _Tile extends StatelessWidget {
     required this.onTap,
     this.subtitle,
     this.iconColor,
-    this.trailingIcon,
   });
 
   final IconData icon;
@@ -588,7 +574,6 @@ class _Tile extends StatelessWidget {
   final String? subtitle;
   final VoidCallback onTap;
   final Color? iconColor;
-  final IconData? trailingIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -642,7 +627,7 @@ class _Tile extends StatelessWidget {
                   ),
                 ),
                 Icon(
-                  trailingIcon ?? Icons.chevron_right_rounded,
+                  Icons.chevron_right_rounded,
                   color: theme.textTheme.bodySmall?.color,
                   size: 18,
                 ),

@@ -11,6 +11,9 @@ import '../../../core/widgets/primary_button.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/presentation/auth_controller.dart';
 import '../../health/presentation/health_card.dart';
+import '../data/profile_extended_repository.dart';
+import '../domain/extended_profile.dart';
+import 'sheets/profile_edit_sheets.dart';
 
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
@@ -120,6 +123,10 @@ class ProfilePage extends ConsumerWidget {
           ),
 
           const SizedBox(height: 24),
+          _SectionTitle(title: 'Le mie informazioni'),
+          const _MyInformationSection(),
+
+          const SizedBox(height: 16),
           _SectionTitle(title: 'Account'),
           _SettingTile(
             icon: Icons.person_outline_rounded,
@@ -650,3 +657,123 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
     );
   }
 }
+
+// ─────────────────────── Le mie informazioni (estese) ─────────────────────
+
+class _MyInformationSection extends ConsumerWidget {
+  const _MyInformationSection();
+
+  Future<void> _openSheet(BuildContext context, Widget sheet) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => sheet,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final async = ref.watch(extendedProfileProvider);
+
+    return async.when(
+      loading: () => const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (e, _) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          'Impossibile caricare le informazioni',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ),
+      data: (p) {
+        final injuriesActive = p.injuries
+            .where((i) => (i as Map<String, dynamic>)['stato'] == 'attivo')
+            .length;
+        return Column(
+          children: [
+            _SettingTile(
+              icon: Icons.fitness_center_outlined,
+              title: 'Dati fisici',
+              subtitle: _summarizePhysical(p.physical),
+              onTap: () => _openSheet(context, PhysicalEditSheet(initial: p.physical)),
+            ),
+            _SettingTile(
+              icon: Icons.flag_outlined,
+              title: 'Obiettivi',
+              subtitle: p.goals.obiettivo != null
+                  ? _capitalize(p.goals.obiettivo!)
+                  : 'Non impostati',
+              onTap: () => _openSheet(context, GoalsEditSheet(initial: p.goals)),
+            ),
+            _SettingTile(
+              icon: Icons.restaurant_outlined,
+              title: 'Alimentazione',
+              subtitle: _summarizeNutrition(p.nutritionPreferences),
+              onTap: () => _openSheet(
+                  context, NutritionPrefsEditSheet(initial: p.nutritionPreferences)),
+            ),
+            _SettingTile(
+              icon: Icons.nightlight_round,
+              title: 'Stile di vita',
+              subtitle: _summarizeLifestyle(p.lifestyle),
+              onTap: () => _openSheet(context, LifestyleEditSheet(initial: p.lifestyle)),
+            ),
+            _SettingTile(
+              icon: Icons.medical_information_outlined,
+              title: 'Storico medico',
+              subtitle: p.medicalHistory.hasContent
+                  ? 'Compilato (cifrato)'
+                  : 'Aggiungi patologie e farmaci',
+              onTap: () =>
+                  _openSheet(context, MedicalEditSheet(initial: p.medicalHistory)),
+            ),
+            _SettingTile(
+              icon: Icons.healing_outlined,
+              title: 'Infortuni',
+              subtitle: injuriesActive > 0
+                  ? '$injuriesActive attivo${injuriesActive == 1 ? "" : "i"}'
+                  : 'Nessuno registrato',
+              onTap: () => context.push('/profile/injuries'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _summarizePhysical(PhysicalData p) {
+    final parts = <String>[];
+    if (p.peso != null) parts.add('${p.peso} kg');
+    if (p.altezza != null) parts.add('${p.altezza} cm');
+    if (p.eta != null) parts.add('${p.eta} anni');
+    if (parts.isEmpty) return 'Aggiungi peso, altezza, età';
+    return parts.join(' · ');
+  }
+
+  String _summarizeNutrition(NutritionPreferences n) {
+    final parts = <String>[];
+    if (n.regimeAlimentare != null) parts.add(_capitalize(n.regimeAlimentare!));
+    final all = n.allergeni?.length ?? 0;
+    if (all > 0) parts.add('$all allergen${all == 1 ? "e" : "i"}');
+    if (parts.isEmpty) return 'Regime, allergeni, preferenze';
+    return parts.join(' · ');
+  }
+
+  String _summarizeLifestyle(LifestyleData l) {
+    final parts = <String>[];
+    if (l.oreSonnoMedie != null) parts.add('${l.oreSonnoMedie}h sonno');
+    if (l.nPastiDie != null) parts.add('${l.nPastiDie} pasti/die');
+    if (parts.isEmpty) return 'Sonno, pasti, stress, fumo';
+    return parts.join(' · ');
+  }
+
+  String _capitalize(String s) =>
+      s.isEmpty ? s : s[0].toUpperCase() + s.substring(1);
+}
+

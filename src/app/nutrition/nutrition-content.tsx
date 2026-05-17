@@ -35,6 +35,9 @@ import {
     Search,
 } from "lucide-react";
 import { Pagination } from "@/components/ui/pagination";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { RequestsTab } from "./_components/requests-tab";
+import type { NutritionRequestListItem } from "@/lib/services/nutrition-requests.service";
 
 const DEFAULT_PAGE_SIZE = 10;
 
@@ -53,9 +56,13 @@ type ClientLite = { id: number; nome: string; cognome: string };
 
 export default function NutritionContent({
     plans,
+    pendingRequestsCount,
+    requests,
 }: {
     plans: PlanRow[];
     clients: ClientLite[];
+    pendingRequestsCount: number;
+    requests: NutritionRequestListItem[];
 }) {
     const [pending, startTransition] = useTransition();
     const [search, setSearch] = useState("");
@@ -90,7 +97,7 @@ export default function NutritionContent({
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
+                    <h1 className="text-2xl sm:text-3xl font-bold brand-text tracking-tight">
                         Nutrizione
                     </h1>
                     <p className="text-slate-500 mt-1">
@@ -104,6 +111,22 @@ export default function NutritionContent({
                 </Link>
             </div>
 
+            <Tabs defaultValue="plans">
+                <TabsList className="w-full overflow-x-auto justify-start sm:w-auto sm:justify-center">
+                    <TabsTrigger value="plans" className="data-[state=active]:brand-bg data-[state=active]:!text-white">
+                        Piani attivi ({plans.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="requests" className="data-[state=active]:brand-bg data-[state=active]:!text-white gap-2">
+                        Richieste
+                        {pendingRequestsCount > 0 && (
+                            <Badge className="brand-bg !text-white border-0 ml-1 h-5 min-w-5 px-1.5 text-[10px]">
+                                {pendingRequestsCount}
+                            </Badge>
+                        )}
+                    </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="plans" className="mt-4">
             {plans.length === 0 ? (
                 <Card className="bg-white border-slate-200 shadow-sm overflow-hidden">
                     <CardContent className="py-16 text-center">
@@ -277,6 +300,12 @@ export default function NutritionContent({
                     />
                 </>
             )}
+                </TabsContent>
+
+                <TabsContent value="requests" className="mt-4">
+                    <RequestsTab initialRequests={requests} />
+                </TabsContent>
+            </Tabs>
         </div>
     );
 }

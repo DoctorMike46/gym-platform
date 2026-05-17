@@ -77,15 +77,15 @@ export default function DiaryContent({
         <TooltipProvider delayDuration={300}>
             <Tabs defaultValue="logs">
                 <TabsList className="w-full overflow-x-auto justify-start sm:w-auto sm:justify-center">
-                    <TabsTrigger value="logs" className="text-xs sm:text-sm">
+                    <TabsTrigger value="logs" className="text-xs sm:text-sm data-[state=active]:brand-bg data-[state=active]:!text-white">
                         <span className="sm:hidden">Allen. ({logs.length})</span>
                         <span className="hidden sm:inline">Allenamenti ({logs.length})</span>
                     </TabsTrigger>
-                    <TabsTrigger value="measurements" className="text-xs sm:text-sm">
+                    <TabsTrigger value="measurements" className="text-xs sm:text-sm data-[state=active]:brand-bg data-[state=active]:!text-white">
                         <span className="sm:hidden">Misur. ({measurements.length})</span>
                         <span className="hidden sm:inline">Misurazioni ({measurements.length})</span>
                     </TabsTrigger>
-                    <TabsTrigger value="photos" className="text-xs sm:text-sm">Foto ({photos.length})</TabsTrigger>
+                    <TabsTrigger value="photos" className="text-xs sm:text-sm data-[state=active]:brand-bg data-[state=active]:!text-white">Foto ({photos.length})</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="logs" className="mt-4">
@@ -182,7 +182,16 @@ function WorkoutLogsTab({ clientId, logs }: { clientId: number; logs: WorkoutLog
                                     {l.total_duration_seconds ? `${Math.round(l.total_duration_seconds / 60)} min` : "—"}
                                 </TableCell>
                                 <TableCell>
-                                    <Badge variant={l.status === "completed" ? "default" : "outline"}>
+                                    <Badge
+                                        variant={l.status === "completed" ? "default" : "outline"}
+                                        className={
+                                            l.status === "completed"
+                                                ? "brand-bg !text-white border-0"
+                                                : l.status === "in_progress"
+                                                    ? "brand-text brand-border"
+                                                    : ""
+                                        }
+                                    >
                                         {l.status === "completed" ? "Completato" : l.status === "in_progress" ? "In corso" : "Saltato"}
                                     </Badge>
                                 </TableCell>
@@ -228,7 +237,16 @@ function WorkoutLogsTab({ clientId, logs }: { clientId: number; logs: WorkoutLog
                                         {l.total_duration_seconds && <> • {Math.round(l.total_duration_seconds / 60)} min</>}
                                     </p>
                                 </div>
-                                <Badge variant={l.status === "completed" ? "default" : "outline"} className="shrink-0">
+                                <Badge
+                                    variant={l.status === "completed" ? "default" : "outline"}
+                                    className={
+                                        l.status === "completed"
+                                            ? "shrink-0 brand-bg !text-white border-0"
+                                            : l.status === "in_progress"
+                                                ? "shrink-0 brand-text brand-border"
+                                                : "shrink-0"
+                                    }
+                                >
                                     {l.status === "completed" ? "Completato" : l.status === "in_progress" ? "In corso" : "Saltato"}
                                 </Badge>
                             </div>

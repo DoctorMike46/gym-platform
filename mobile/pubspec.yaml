@@ -57,6 +57,7 @@ dependencies:
   file_picker: ^11.0.2
   health: ^13.3.1
   permission_handler: ^12.0.1
+  webview_flutter: ^4.10.0      # In-app browser per pagine legali (privacy/ToS)
 
   # Sicurezza
   crypto: ^3.0.6          # H3 — certificate pinning (sha256 del cert leaf)
