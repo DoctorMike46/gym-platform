@@ -1,3 +1,5 @@
+import "server-only";
+
 import { db } from "@/db";
 import { client_lifestyle, clients } from "@/db/schema";
 import { and, eq, isNull } from "drizzle-orm";

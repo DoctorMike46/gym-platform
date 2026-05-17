@@ -1,3 +1,5 @@
+import "server-only";
+
 import { db } from "@/db";
 import { client_medical_history, clients } from "@/db/schema";
 import { and, eq, isNull, sql } from "drizzle-orm";

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Inbox, Search, Calendar, UserRound, ChevronRight } from "lucide-react";
 import { RequestDetailDialog } from "./request-detail-dialog";
-import type { NutritionRequestListItem } from "@/lib/services/nutrition-requests.service";
+import type { NutritionRequestListItem } from "@/lib/services/nutrition-requests.types";
 
 const STATUS_LABEL: Record<string, string> = {
     pending: "In attesa",

@@ -1,10 +1,10 @@
 import { NextRequest } from "next/server";
 import { jsonError, jsonOk, requireApiClientAuth } from "@/lib/api-auth";
+import { createNutritionRequest } from "@/lib/services/nutrition-requests.service";
 import {
-    createNutritionRequest,
-    type CreateRequestInput,
     OBIETTIVI,
-} from "@/lib/services/nutrition-requests.service";
+    type CreateRequestInput,
+} from "@/lib/services/nutrition-requests.types";
 
 export const runtime = "nodejs";
 

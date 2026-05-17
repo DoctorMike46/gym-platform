@@ -19,7 +19,7 @@ import {
     getNutritionRequestDetail,
     markNutritionRequestInReview,
 } from "@/lib/actions/nutrition-requests";
-import type { NutritionRequest } from "@/lib/services/nutrition-requests.service";
+import type { NutritionRequest } from "@/lib/services/nutrition-requests.types";
 import { Loader2 } from "lucide-react";
 
 interface Props {

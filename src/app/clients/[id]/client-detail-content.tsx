@@ -44,7 +44,7 @@ import { toast } from "sonner";
 import { InjuryBanner } from "@/components/workouts/injury-banner";
 import { InjuryAckModal } from "@/components/workouts/injury-ack-modal";
 import { ClientInjuriesCard } from "@/components/clients/injuries-card";
-import type { ClientInjury } from "@/lib/services/injuries.service";
+import type { ClientInjury } from "@/lib/services/injuries.types";
 
 export default function ClientDetailContent({
     client,

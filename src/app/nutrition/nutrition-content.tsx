@@ -37,7 +37,7 @@ import {
 import { Pagination } from "@/components/ui/pagination";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { RequestsTab } from "./_components/requests-tab";
-import type { NutritionRequestListItem } from "@/lib/services/nutrition-requests.service";
+import type { NutritionRequestListItem } from "@/lib/services/nutrition-requests.types";
 
 const DEFAULT_PAGE_SIZE = 10;
 

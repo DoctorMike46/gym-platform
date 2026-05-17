@@ -38,7 +38,7 @@ import {
     type ClientInjury,
     type InjuryGravita,
     type InjuryType,
-} from "@/lib/services/injuries.service";
+} from "@/lib/services/injuries.types";
 
 const PART_LABEL: Record<BodyPart, string> = {
     spalla_sx: "Spalla sx", spalla_dx: "Spalla dx",

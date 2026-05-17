@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, ChevronRight } from "lucide-react";
-import type { ClientInjury } from "@/lib/services/injuries.service";
+import type { ClientInjury } from "@/lib/services/injuries.types";
 
 const PART_LABEL: Record<string, string> = {
     spalla_sx: "Spalla sx", spalla_dx: "Spalla dx",
