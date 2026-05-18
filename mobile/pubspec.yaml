@@ -76,18 +76,42 @@ dev_dependencies:
   riverpod_lint: ^2.6.4
 
   # Genera icone app (iOS + Android) da un singolo PNG sorgente.
-  # Uso: `flutter pub run flutter_launcher_icons` dopo aver impostato la config sotto.
+  # Uso: `dart run flutter_launcher_icons` dopo aver impostato la config sotto.
   flutter_launcher_icons: ^0.14.4
+
+  # Genera splash screen native iOS + Android partendo da un PNG.
+  # Uso: `dart run flutter_native_splash:create` dopo aver impostato la config.
+  flutter_native_splash: ^2.4.3
 
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
   remove_alpha_ios: true
-  # Sostituisci con il path alla tua icona 1024x1024 PNG (senza canale alpha per iOS).
+  # Sorgente: PNG 1024x1024 senza testo (icon.kitchen → "Source").
   image_path: "assets/icon/app_icon.png"
-  # Adaptive icon Android (opzionale, consigliato): immagine in primo piano + colore di sfondo.
-  # adaptive_icon_background: "#FFFFFF"
-  # adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  # Adaptive icon Android (Android 8+): sfondo nero coerente col logo.
+  # Il foreground usa la stessa immagine (con padding interno automatico).
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/icon/app_icon.png"
+
+# Splash screen native iOS + Android.
+flutter_native_splash:
+  # Sfondo nero, coerente con il logo EG Elevate Performance.
+  color: "#000000"
+  color_dark: "#000000"
+  # Logo centrato (PNG con alpha, idealmente quadrato 1024x1024).
+  image: "assets/icon/app_icon.png"
+  image_dark: "assets/icon/app_icon.png"
+  android: true
+  ios: true
+  # Android 12+: usa il sistema splash con icona centrale.
+  android_12:
+    image: "assets/icon/app_icon.png"
+    icon_background_color: "#000000"
+    image_dark: "assets/icon/app_icon.png"
+    icon_background_color_dark: "#000000"
+  # Niente fullscreen né web (l'app non è web).
+  web: false
 
 flutter:
   uses-material-design: true

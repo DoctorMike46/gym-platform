@@ -14,7 +14,7 @@
         <package android:name="com.google.android.apps.healthdata" />
     </queries>
     <application
-        android:label="gym_platform_mobile"
+        android:label="gym_platform"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
