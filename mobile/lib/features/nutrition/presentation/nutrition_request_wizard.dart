@@ -14,7 +14,7 @@ import '../domain/nutrition_request.dart';
 
 class WizardState {
   WizardState({
-    Obiettivo? obiettivo,
+    this.obiettivo,
     this.timeframeSettimane,
     this.pesoTargetKg,
     this.motivazione,
@@ -34,87 +34,155 @@ class WizardState {
     this.farmaci,
     this.noteLibere,
     this.acceptMedicalDisclaimer = false,
-  })  : obiettivo = obiettivo,
-        allergeni = allergeni ?? [],
-        intolleranze = intolleranze ?? [],
-        cibiPreferiti = cibiPreferiti ?? [],
-        cibiEvitati = cibiEvitati ?? [],
-        orariPasti = orariPasti ?? [];
+  })  : allergeni = allergeni ?? const [],
+        intolleranze = intolleranze ?? const [],
+        cibiPreferiti = cibiPreferiti ?? const [],
+        cibiEvitati = cibiEvitati ?? const [],
+        orariPasti = orariPasti ?? const [];
 
-  Obiettivo? obiettivo;
-  int? timeframeSettimane;
-  String? pesoTargetKg;
-  String? motivazione;
-  String? regimeAlimentare;
-  List<String> allergeni;
-  List<String> intolleranze;
-  List<String> cibiPreferiti;
-  List<String> cibiEvitati;
-  int? nPastiDie;
-  List<String> orariPasti;
-  int? occasioniSociali;
-  int? oreSonno;
-  int? livelloStress;
-  String? consumoAcquaLitri;
-  String? fumo;
-  String? patologie;
-  String? farmaci;
-  String? noteLibere;
-  bool acceptMedicalDisclaimer;
+  final Obiettivo? obiettivo;
+  final int? timeframeSettimane;
+  final String? pesoTargetKg;
+  final String? motivazione;
+  final String? regimeAlimentare;
+  final List<String> allergeni;
+  final List<String> intolleranze;
+  final List<String> cibiPreferiti;
+  final List<String> cibiEvitati;
+  final int? nPastiDie;
+  final List<String> orariPasti;
+  final int? occasioniSociali;
+  final int? oreSonno;
+  final int? livelloStress;
+  final String? consumoAcquaLitri;
+  final String? fumo;
+  final String? patologie;
+  final String? farmaci;
+  final String? noteLibere;
+  final bool acceptMedicalDisclaimer;
+
+  WizardState copyWith({
+    Object? obiettivo = _unset,
+    Object? timeframeSettimane = _unset,
+    Object? pesoTargetKg = _unset,
+    Object? motivazione = _unset,
+    Object? regimeAlimentare = _unset,
+    List<String>? allergeni,
+    List<String>? intolleranze,
+    List<String>? cibiPreferiti,
+    List<String>? cibiEvitati,
+    Object? nPastiDie = _unset,
+    List<String>? orariPasti,
+    Object? occasioniSociali = _unset,
+    Object? oreSonno = _unset,
+    Object? livelloStress = _unset,
+    Object? consumoAcquaLitri = _unset,
+    Object? fumo = _unset,
+    Object? patologie = _unset,
+    Object? farmaci = _unset,
+    Object? noteLibere = _unset,
+    bool? acceptMedicalDisclaimer,
+  }) {
+    return WizardState(
+      obiettivo: obiettivo == _unset ? this.obiettivo : obiettivo as Obiettivo?,
+      timeframeSettimane: timeframeSettimane == _unset
+          ? this.timeframeSettimane
+          : timeframeSettimane as int?,
+      pesoTargetKg:
+          pesoTargetKg == _unset ? this.pesoTargetKg : pesoTargetKg as String?,
+      motivazione:
+          motivazione == _unset ? this.motivazione : motivazione as String?,
+      regimeAlimentare: regimeAlimentare == _unset
+          ? this.regimeAlimentare
+          : regimeAlimentare as String?,
+      allergeni: allergeni ?? this.allergeni,
+      intolleranze: intolleranze ?? this.intolleranze,
+      cibiPreferiti: cibiPreferiti ?? this.cibiPreferiti,
+      cibiEvitati: cibiEvitati ?? this.cibiEvitati,
+      nPastiDie: nPastiDie == _unset ? this.nPastiDie : nPastiDie as int?,
+      orariPasti: orariPasti ?? this.orariPasti,
+      occasioniSociali: occasioniSociali == _unset
+          ? this.occasioniSociali
+          : occasioniSociali as int?,
+      oreSonno: oreSonno == _unset ? this.oreSonno : oreSonno as int?,
+      livelloStress:
+          livelloStress == _unset ? this.livelloStress : livelloStress as int?,
+      consumoAcquaLitri: consumoAcquaLitri == _unset
+          ? this.consumoAcquaLitri
+          : consumoAcquaLitri as String?,
+      fumo: fumo == _unset ? this.fumo : fumo as String?,
+      patologie: patologie == _unset ? this.patologie : patologie as String?,
+      farmaci: farmaci == _unset ? this.farmaci : farmaci as String?,
+      noteLibere:
+          noteLibere == _unset ? this.noteLibere : noteLibere as String?,
+      acceptMedicalDisclaimer:
+          acceptMedicalDisclaimer ?? this.acceptMedicalDisclaimer,
+    );
+  }
 }
+
+// Sentinella per distinguere "non passato" da "passato null" in copyWith.
+const Object _unset = Object();
 
 class WizardController extends StateNotifier<WizardState> {
   WizardController() : super(WizardState());
 
   void hydrateFromProfile(ExtendedProfile p) {
-    state.pesoTargetKg ??= p.goals.pesoTargetKg;
-    state.motivazione ??= p.goals.motivazione;
+    Obiettivo? obiettivoDaProfilo;
     if (state.obiettivo == null && p.goals.obiettivo != null) {
       try {
-        state.obiettivo =
-            Obiettivo.values.byName(p.goals.obiettivo!);
+        obiettivoDaProfilo = Obiettivo.values.byName(p.goals.obiettivo!);
       } catch (_) {
         // ignore: nome non corrisponde
       }
     }
-    state.timeframeSettimane ??= p.goals.timeframeSettimane;
-    state.regimeAlimentare ??= p.nutritionPreferences.regimeAlimentare;
-    if (state.allergeni.isEmpty && p.nutritionPreferences.allergeni != null) {
-      state.allergeni = List.of(p.nutritionPreferences.allergeni!);
-    }
-    if (state.intolleranze.isEmpty &&
-        p.nutritionPreferences.intolleranze != null) {
-      state.intolleranze = List.of(p.nutritionPreferences.intolleranze!);
-    }
-    if (state.cibiPreferiti.isEmpty &&
-        p.nutritionPreferences.preferenzeAlimenti != null) {
-      state.cibiPreferiti = List.of(p.nutritionPreferences.preferenzeAlimenti!);
-    }
-    if (state.cibiEvitati.isEmpty &&
-        p.nutritionPreferences.esclusioniAlimenti != null) {
-      state.cibiEvitati = List.of(p.nutritionPreferences.esclusioniAlimenti!);
-    }
-    state.nPastiDie ??= p.lifestyle.nPastiDie;
-    if (state.orariPasti.isEmpty && p.lifestyle.orariPasti != null) {
-      state.orariPasti = List.of(p.lifestyle.orariPasti!);
-    }
-    state.occasioniSociali ??= p.lifestyle.occasioniSocialiSettimana;
-    state.oreSonno ??= p.lifestyle.oreSonnoMedie;
-    state.livelloStress ??= p.lifestyle.livelloStress;
-    state.consumoAcquaLitri ??= p.lifestyle.consumoAcquaLitri;
-    state.fumo ??= p.lifestyle.fumo;
-    state.patologie ??= p.medicalHistory.patologie;
-    state.farmaci ??= p.medicalHistory.farmaci;
-    if (p.medicalHistory.hasAcceptedDisclaimer) {
-      state.acceptMedicalDisclaimer = true;
-    }
-    // Forza ricostruzione dei watcher
-    state = state;
+    state = state.copyWith(
+      obiettivo: state.obiettivo ?? obiettivoDaProfilo,
+      pesoTargetKg: state.pesoTargetKg ?? p.goals.pesoTargetKg,
+      motivazione: state.motivazione ?? p.goals.motivazione,
+      timeframeSettimane:
+          state.timeframeSettimane ?? p.goals.timeframeSettimane,
+      regimeAlimentare:
+          state.regimeAlimentare ?? p.nutritionPreferences.regimeAlimentare,
+      allergeni: state.allergeni.isEmpty &&
+              p.nutritionPreferences.allergeni != null
+          ? List.of(p.nutritionPreferences.allergeni!)
+          : state.allergeni,
+      intolleranze: state.intolleranze.isEmpty &&
+              p.nutritionPreferences.intolleranze != null
+          ? List.of(p.nutritionPreferences.intolleranze!)
+          : state.intolleranze,
+      cibiPreferiti: state.cibiPreferiti.isEmpty &&
+              p.nutritionPreferences.preferenzeAlimenti != null
+          ? List.of(p.nutritionPreferences.preferenzeAlimenti!)
+          : state.cibiPreferiti,
+      cibiEvitati: state.cibiEvitati.isEmpty &&
+              p.nutritionPreferences.esclusioniAlimenti != null
+          ? List.of(p.nutritionPreferences.esclusioniAlimenti!)
+          : state.cibiEvitati,
+      nPastiDie: state.nPastiDie ?? p.lifestyle.nPastiDie,
+      orariPasti:
+          state.orariPasti.isEmpty && p.lifestyle.orariPasti != null
+              ? List.of(p.lifestyle.orariPasti!)
+              : state.orariPasti,
+      occasioniSociali:
+          state.occasioniSociali ?? p.lifestyle.occasioniSocialiSettimana,
+      oreSonno: state.oreSonno ?? p.lifestyle.oreSonnoMedie,
+      livelloStress: state.livelloStress ?? p.lifestyle.livelloStress,
+      consumoAcquaLitri:
+          state.consumoAcquaLitri ?? p.lifestyle.consumoAcquaLitri,
+      fumo: state.fumo ?? p.lifestyle.fumo,
+      patologie: state.patologie ?? p.medicalHistory.patologie,
+      farmaci: state.farmaci ?? p.medicalHistory.farmaci,
+      acceptMedicalDisclaimer: state.acceptMedicalDisclaimer ||
+          p.medicalHistory.hasAcceptedDisclaimer,
+    );
   }
 
-  void update(void Function(WizardState s) mutator) {
-    mutator(state);
-    state = state;
+  /// Aggiorna lo stato passando una copyWith. Esempio:
+  ///   c.set((s) => s.copyWith(obiettivo: Obiettivo.dimagrimento));
+  void set(WizardState Function(WizardState s) mutator) {
+    state = mutator(state);
   }
 }
 
@@ -348,8 +416,10 @@ class _StepObiettivo extends _StepBase {
         for (final o in Obiettivo.values)
           RadioListTile<Obiettivo>(
             value: o,
+            // ignore: deprecated_member_use
             groupValue: s.obiettivo,
-            onChanged: (v) => c.update((st) => st.obiettivo = v),
+            // ignore: deprecated_member_use
+            onChanged: (v) => c.set((st) => st.copyWith(obiettivo: v)),
             title: Text(o.label),
             controlAffinity: ListTileControlAffinity.trailing,
             contentPadding: EdgeInsets.zero,
@@ -361,8 +431,8 @@ class _StepObiettivo extends _StepBase {
               initialValue: s.timeframeSettimane?.toString() ?? '',
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Settimane'),
-              onChanged: (v) => c.update(
-                  (st) => st.timeframeSettimane = int.tryParse(v.trim())),
+              onChanged: (v) => c.set((st) =>
+                  st.copyWith(timeframeSettimane: int.tryParse(v.trim()))),
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -371,8 +441,8 @@ class _StepObiettivo extends _StepBase {
               initialValue: s.pesoTargetKg ?? '',
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(labelText: 'Peso target (kg)'),
-              onChanged: (v) => c.update((st) =>
-                  st.pesoTargetKg = v.trim().isEmpty ? null : v.trim()),
+              onChanged: (v) => c.set((st) => st.copyWith(
+                  pesoTargetKg: v.trim().isEmpty ? null : v.trim())),
             ),
           ),
         ]),
@@ -384,8 +454,8 @@ class _StepObiettivo extends _StepBase {
             labelText: 'Cosa ti motiva? (opzionale)',
             alignLabelWithHint: true,
           ),
-          onChanged: (v) => c.update(
-              (st) => st.motivazione = v.trim().isEmpty ? null : v.trim()),
+          onChanged: (v) => c.set((st) => st.copyWith(
+              motivazione: v.trim().isEmpty ? null : v.trim())),
         ),
       ],
     );
@@ -420,35 +490,35 @@ class _StepAlimentazione extends _StepBase {
               .map((r) => DropdownMenuItem(
                   value: r, child: Text(r[0].toUpperCase() + r.substring(1))))
               .toList(),
-          onChanged: (v) => c.update((st) => st.regimeAlimentare = v),
+          onChanged: (v) => c.set((st) => st.copyWith(regimeAlimentare: v)),
         ),
         const SizedBox(height: AppSpacing.lg),
         _WizardChipGroup(
           label: 'Allergeni',
           values: s.allergeni,
           suggestions: _commonAllergens,
-          onChanged: (list) => c.update((st) => st.allergeni = list),
+          onChanged: (list) => c.set((st) => st.copyWith(allergeni: list)),
           addHint: 'Allergene',
         ),
         const SizedBox(height: AppSpacing.lg),
         _WizardChipGroup(
           label: 'Intolleranze',
           values: s.intolleranze,
-          onChanged: (list) => c.update((st) => st.intolleranze = list),
+          onChanged: (list) => c.set((st) => st.copyWith(intolleranze: list)),
           addHint: 'Intolleranza',
         ),
         const SizedBox(height: AppSpacing.lg),
         _WizardChipGroup(
           label: 'Cibi preferiti',
           values: s.cibiPreferiti,
-          onChanged: (list) => c.update((st) => st.cibiPreferiti = list),
+          onChanged: (list) => c.set((st) => st.copyWith(cibiPreferiti: list)),
           addHint: 'Cibo preferito',
         ),
         const SizedBox(height: AppSpacing.lg),
         _WizardChipGroup(
           label: 'Cibi da evitare',
           values: s.cibiEvitati,
-          onChanged: (list) => c.update((st) => st.cibiEvitati = list),
+          onChanged: (list) => c.set((st) => st.copyWith(cibiEvitati: list)),
           addHint: 'Cibo da evitare',
         ),
       ],
@@ -477,8 +547,8 @@ class _StepPreferenzePasti extends _StepBase {
               initialValue: s.nPastiDie?.toString() ?? '',
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Pasti al giorno'),
-              onChanged: (v) =>
-                  c.update((st) => st.nPastiDie = int.tryParse(v.trim())),
+              onChanged: (v) => c.set(
+                  (st) => st.copyWith(nPastiDie: int.tryParse(v.trim()))),
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -488,8 +558,8 @@ class _StepPreferenzePasti extends _StepBase {
               keyboardType: TextInputType.number,
               decoration:
                   const InputDecoration(labelText: 'Cene fuori/sett.'),
-              onChanged: (v) =>
-                  c.update((st) => st.occasioniSociali = int.tryParse(v.trim())),
+              onChanged: (v) => c.set((st) =>
+                  st.copyWith(occasioniSociali: int.tryParse(v.trim()))),
             ),
           ),
         ]),
@@ -497,7 +567,7 @@ class _StepPreferenzePasti extends _StepBase {
         _WizardChipGroup(
           label: 'Orari abituali pasti',
           values: s.orariPasti,
-          onChanged: (list) => c.update((st) => st.orariPasti = list),
+          onChanged: (list) => c.set((st) => st.copyWith(orariPasti: list)),
           addHint: 'Orario (es. 08:00)',
           suggestions: const ['07:30', '12:30', '16:00', '20:00'],
         ),
@@ -528,7 +598,7 @@ class _StepLifestyle extends _StepBase {
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Ore di sonno'),
               onChanged: (v) =>
-                  c.update((st) => st.oreSonno = int.tryParse(v.trim())),
+                  c.set((st) => st.copyWith(oreSonno: int.tryParse(v.trim()))),
             ),
           ),
           const SizedBox(width: AppSpacing.md),
@@ -537,8 +607,8 @@ class _StepLifestyle extends _StepBase {
               initialValue: s.consumoAcquaLitri ?? '',
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(labelText: 'Acqua (L/die)'),
-              onChanged: (v) => c.update((st) =>
-                  st.consumoAcquaLitri = v.trim().isEmpty ? null : v.trim()),
+              onChanged: (v) => c.set((st) => st.copyWith(
+                  consumoAcquaLitri: v.trim().isEmpty ? null : v.trim())),
             ),
           ),
         ]),
@@ -553,7 +623,8 @@ class _StepLifestyle extends _StepBase {
           max: 10,
           divisions: 9,
           label: '${s.livelloStress ?? 5}',
-          onChanged: (v) => c.update((st) => st.livelloStress = v.round()),
+          onChanged: (v) =>
+              c.set((st) => st.copyWith(livelloStress: v.round())),
         ),
         const SizedBox(height: AppSpacing.sm),
         DropdownButtonFormField<String>(
@@ -564,7 +635,7 @@ class _StepLifestyle extends _StepBase {
             DropdownMenuItem(value: 'si', child: Text('Fumo')),
             DropdownMenuItem(value: 'ex', child: Text('Ex fumatore')),
           ],
-          onChanged: (v) => c.update((st) => st.fumo = v),
+          onChanged: (v) => c.set((st) => st.copyWith(fumo: v)),
         ),
       ],
     );
@@ -618,8 +689,8 @@ class _StepMedico extends _StepBase {
             labelText: 'Patologie croniche',
             alignLabelWithHint: true,
           ),
-          onChanged: (v) => c.update(
-              (st) => st.patologie = v.trim().isEmpty ? null : v.trim()),
+          onChanged: (v) => c.set((st) => st.copyWith(
+              patologie: v.trim().isEmpty ? null : v.trim())),
         ),
         const SizedBox(height: AppSpacing.md),
         TextFormField(
@@ -629,14 +700,14 @@ class _StepMedico extends _StepBase {
             labelText: 'Farmaci in uso',
             alignLabelWithHint: true,
           ),
-          onChanged: (v) => c.update(
-              (st) => st.farmaci = v.trim().isEmpty ? null : v.trim()),
+          onChanged: (v) => c.set((st) => st.copyWith(
+              farmaci: v.trim().isEmpty ? null : v.trim())),
         ),
         const SizedBox(height: AppSpacing.md),
         CheckboxListTile(
           value: s.acceptMedicalDisclaimer,
-          onChanged: (v) =>
-              c.update((st) => st.acceptMedicalDisclaimer = v ?? false),
+          onChanged: (v) => c.set(
+              (st) => st.copyWith(acceptMedicalDisclaimer: v ?? false)),
           controlAffinity: ListTileControlAffinity.leading,
           title: Text(
             'Acconsento al trattamento dei dati sanitari per la finalità del piano alimentare (GDPR art.9).',
@@ -728,8 +799,8 @@ class _StepReview extends _StepBase {
             labelText: 'Note per il trainer (opzionale)',
             alignLabelWithHint: true,
           ),
-          onChanged: (v) => c.update(
-              (st) => st.noteLibere = v.trim().isEmpty ? null : v.trim()),
+          onChanged: (v) => c.set((st) => st.copyWith(
+              noteLibere: v.trim().isEmpty ? null : v.trim())),
         ),
       ],
     );
